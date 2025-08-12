@@ -1,7 +1,8 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:vietmall/common/app_colors.dart';
-import 'package:vietmall/screens/auth/auth_wrapper.dart';
+import 'package:vietmall/screens/main_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -9,6 +10,7 @@ void main() async {
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
+
   runApp(const VietMallApp());
 }
 
@@ -22,31 +24,22 @@ class VietMallApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primaryColor: AppColors.primaryRed,
-        scaffoldBackgroundColor: AppColors.white, // Nền trắng
+        scaffoldBackgroundColor: AppColors.white,
         appBarTheme: const AppBarTheme(
           backgroundColor: AppColors.white,
           foregroundColor: AppColors.black,
-          elevation: 0,
+          elevation: 1,
           centerTitle: true,
           titleTextStyle: TextStyle(
-            fontSize: 22,
+            fontSize: 20,
             fontWeight: FontWeight.bold,
             color: AppColors.black,
           ),
         ),
-        // Sửa lại theme cho ô nhập liệu
         inputDecorationTheme: InputDecorationTheme(
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(8),
             borderSide: BorderSide(color: AppColors.grey.withOpacity(0.5)),
-          ),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: BorderSide(color: AppColors.grey.withOpacity(0.5)),
-          ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(8),
-            borderSide: const BorderSide(color: AppColors.primaryRed, width: 1.5),
           ),
         ),
         elevatedButtonTheme: ElevatedButtonThemeData(
@@ -60,7 +53,7 @@ class VietMallApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const AuthWrapper(),
+      home: const MainScreen(),
     );
   }
 }

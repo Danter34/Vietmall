@@ -21,6 +21,7 @@ dependencies:
   # UI & State Management
   cupertino_icons: ^1.0.2
   intl: ^0.18.1
+  carousel_slider: 5.0.0
   # image_picker: ^1.0.7  <-- XÓA DÒNG NÀY
   # path: ^1.8.3          <-- XÓA DÒNG NÀY
 

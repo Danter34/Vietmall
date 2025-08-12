@@ -34,4 +34,18 @@ class ProductModel {
       sellerName: data['sellerName'] ?? '',
     );
   }
+
+  // Factory mới để chuyển đổi từ Map (dữ liệu của feed post)
+  factory ProductModel.fromMap(Map<String, dynamic> data) {
+    return ProductModel(
+      id: data['productId'] ?? '', // Feed post dùng 'productId'
+      title: data['title'] ?? '',
+      description: data['description'] ?? 'Không có mô tả chi tiết.',
+      price: (data['price'] ?? 0).toDouble(),
+      imageUrls: List<String>.from(data['imageUrls'] ?? []),
+      createdAt: data['createdAt'] ?? Timestamp.now(),
+      sellerId: data['sellerId'] ?? '',
+      sellerName: data['sellerName'] ?? '',
+    );
+  }
 }

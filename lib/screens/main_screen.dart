@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/screens/home/home_screen.dart';
 import 'package:vietmall/screens/post/post_item_screen.dart';
-import 'package:vietmall/services/auth_service.dart';
+import 'package:vietmall/screens/profile/profile_screen.dart';
+import 'package:vietmall/widgets/auth_required_dialog.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:vietmall/screens/feed/feed_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,9 +19,9 @@ class _MainScreenState extends State<MainScreen> {
 
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeScreen(),
-    const Center(child: Text('Dạo VietMall')),
+    const FeedScreen(),
     const Center(child: Text('Thông báo')),
-    Scaffold(appBar: AppBar(title: const Text("Tài khoản")), body: Center(child: ElevatedButton(onPressed: () => AuthService().signOut(), child: const Text("Đăng xuất")))),
+    const ProfileScreen(), // Sử dụng ProfileScreen mới
   ];
 
   void _onItemTapped(int index) {
@@ -28,10 +31,15 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   void _navigateToPostScreen() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (context) => const PostItemScreen()),
-    );
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || user.isAnonymous) {
+      showAuthRequiredDialog(context);
+    } else {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const PostItemScreen()),
+      );
+    }
   }
 
   @override
@@ -49,7 +57,7 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: <Widget>[
             _buildNavItem(icon: Icons.home_outlined, label: 'Trang chủ', index: 0),
-            _buildNavItem(icon: Icons.shopping_bag_outlined, label: 'Dạo', index: 1), // Rút gọn label
+            _buildNavItem(icon: Icons.shopping_bag_outlined, label: 'Dạo', index: 1),
             const SizedBox(width: 40),
             _buildNavItem(icon: Icons.notifications_none_outlined, label: 'Thông báo', index: 2),
             _buildNavItem(icon: Icons.person_outline, label: 'Tài khoản', index: 3),
@@ -58,7 +66,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
       floatingActionButton: SizedBox(
-        width: 65, // Giảm kích thước nút
+        width: 65,
         height: 65,
         child: FloatingActionButton(
           onPressed: _navigateToPostScreen,
@@ -70,7 +78,7 @@ class _MainScreenState extends State<MainScreen> {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.add, size: 28),
-              Text("Đăng tin", style: TextStyle(fontSize: 9)), // Giảm cỡ chữ
+              Text("Đăng tin", style: TextStyle(fontSize: 9)),
             ],
           ),
         ),
@@ -90,7 +98,7 @@ class _MainScreenState extends State<MainScreen> {
           children: [
             Icon(icon, color: isSelected ? AppColors.primaryRed : AppColors.greyDark),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: isSelected ? AppColors.primaryRed : AppColors.greyDark, fontSize: 11)), // Giảm cỡ chữ
+            Text(label, style: TextStyle(color: isSelected ? AppColors.primaryRed : AppColors.greyDark, fontSize: 11)),
           ],
         ),
       ),

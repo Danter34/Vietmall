@@ -55,6 +55,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(result), backgroundColor: Colors.red),
           );
+        } else {
+          // Đăng ký thành công, chuyển sang trang đăng nhập
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Đăng ký thành công! Vui lòng đăng nhập.")),
+          );
+          widget.showLoginPage();
         }
       }
     }
@@ -66,7 +72,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       appBar: AppBar(
         backgroundColor: AppColors.primaryRed,
         foregroundColor: AppColors.white,
-        leading: IconButton(icon: const Icon(Icons.arrow_back), onPressed: widget.showLoginPage),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text("VietMall"),
         titleTextStyle: const TextStyle(
           fontSize: 22,
@@ -207,40 +216,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _socialButton(
-          imagePath: 'assets/logo/Facebook_Logo_(2019).png',
-          label: "Facebook",
-          onTap: () {},
-        ),
+        _socialButton(icon: Icons.facebook, label: "Facebook", onTap: () {}, iconColor: const Color(0xFF1877F2)),
         const SizedBox(width: 16),
-        _socialButton(
-          imagePath: 'assets/logo/google-new-logo-has-changed-its-g-letter-381836338.png',
-          label: "Google",
-          onTap: () {},
-        ),
+        _socialButton(icon: Icons.g_mobiledata, label: "Google", onTap: () {}, iconColor: Colors.red),
         const SizedBox(width: 16),
-        _socialButton(
-          imagePath: 'assets/logo/Icon_of_Zalo.svg.png',
-          label: "Zalo",
-          onTap: () {},
-        ),
+        _socialButton(icon: Icons.message, label: "Zalo", onTap: () {}, iconColor: const Color(0xFF0068FF)),
       ],
     );
   }
 
-  Widget _socialButton({
-    required String imagePath,
-    required String label,
-    required VoidCallback onTap,
-  }) {
+  Widget _socialButton({required IconData icon, required String label, required VoidCallback onTap, required Color iconColor}) {
     return OutlinedButton.icon(
       onPressed: onTap,
-      icon: Image.asset(
-        imagePath,
-        height: 20,
-        width: 20,
-        fit: BoxFit.contain,
-      ),
+      icon: Icon(icon, color: iconColor),
       label: Text(label, style: const TextStyle(color: Colors.black)),
       style: OutlinedButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

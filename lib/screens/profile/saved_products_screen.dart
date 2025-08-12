@@ -4,38 +4,24 @@ import 'package:vietmall/models/product_model.dart';
 import 'package:vietmall/screens/home/widgets/product_card.dart';
 import 'package:vietmall/services/database_service.dart';
 
-class ProductListScreen extends StatefulWidget {
-  final String? categoryId;
-  final String? categoryName;
-  final String? searchQuery;
-
-  const ProductListScreen({
-    super.key,
-    this.categoryId,
-    this.categoryName,
-    this.searchQuery,
-  }) : assert(categoryId != null || searchQuery != null);
+class SavedProductsScreen extends StatefulWidget {
+  const SavedProductsScreen({super.key});
 
   @override
-  State<ProductListScreen> createState() => _ProductListScreenState();
+  State<SavedProductsScreen> createState() => _SavedProductsScreenState();
 }
 
-class _ProductListScreenState extends State<ProductListScreen> {
+class _SavedProductsScreenState extends State<SavedProductsScreen> {
   final DatabaseService _databaseService = DatabaseService();
 
   @override
   Widget build(BuildContext context) {
-    final String appBarTitle = widget.searchQuery != null ? 'Kết quả cho "${widget.searchQuery}"' : widget.categoryName!;
-    final Stream<QuerySnapshot> productStream = widget.searchQuery != null
-        ? _databaseService.searchProductsByName(widget.searchQuery!)
-        : _databaseService.getProductsByCategory(widget.categoryId!);
-
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle),
+        title: const Text("Tin đăng đã lưu"),
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: productStream,
+        stream: _databaseService.getFavoriteProducts(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
             return const Center(child: Text("Đã có lỗi xảy ra."));
@@ -44,7 +30,7 @@ class _ProductListScreenState extends State<ProductListScreen> {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-            return const Center(child: Text("Không tìm thấy sản phẩm nào."));
+            return const Center(child: Text("Bạn chưa lưu tin đăng nào."));
           }
 
           return GridView.builder(

@@ -1,12 +1,17 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:carousel_slider/carousel_slider.dart';
 import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/models/category_model.dart';
 import 'package:vietmall/models/product_model.dart';
+import 'package:vietmall/screens/cart/cart_screen.dart';
+import 'package:vietmall/screens/chat/chat_list_screen.dart';
 import 'package:vietmall/screens/home/widgets/category_card.dart';
 import 'package:vietmall/screens/home/widgets/product_card.dart';
+import 'package:vietmall/screens/product/product_list_screen.dart';
 import 'package:vietmall/services/database_service.dart';
-import 'package:vietmall/screens/chat/chat_list_screen.dart';
+import 'package:vietmall/widgets/auth_required_dialog.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -17,6 +22,20 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
+  final TextEditingController _searchController = TextEditingController();
+  int _currentBannerIndex = 0;
+
+  final List<String> _bannerImages = [
+    'https://via.placeholder.com/600x250/FF0000/FFFFFF?text=Banner+1',
+    'https://via.placeholder.com/600x250/0000FF/FFFFFF?text=Banner+2',
+    'https://via.placeholder.com/600x250/00FF00/FFFFFF?text=Banner+3',
+  ];
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -26,6 +45,7 @@ class _HomeScreenState extends State<HomeScreen> {
         color: AppColors.white,
         child: ListView(
           children: [
+            _buildBanner(),
             _buildQuickActions(),
             const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
             _buildSectionTitle('Khám phá danh mục'),
@@ -49,28 +69,95 @@ class _HomeScreenState extends State<HomeScreen> {
           color: AppColors.greyLight,
           borderRadius: BorderRadius.circular(8),
         ),
-        child: const TextField(
-          decoration: InputDecoration(
+        child: TextField(
+          controller: _searchController,
+          decoration: const InputDecoration(
             hintText: 'Tìm kiếm trên VietMall',
             prefixIcon: Icon(Icons.search, color: AppColors.greyDark),
             border: InputBorder.none,
             contentPadding: EdgeInsets.symmetric(vertical: 10),
           ),
+          onSubmitted: (value) {
+            if (value.trim().isNotEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => ProductListScreen(
+                    searchQuery: value.trim(),
+                  ),
+                ),
+              );
+            }
+          },
         ),
       ),
       actions: [
         IconButton(
           icon: const Icon(Icons.shopping_cart_outlined, color: AppColors.greyDark),
-          onPressed: () {},
+          onPressed: () {
+            final user = FirebaseAuth.instance.currentUser;
+            if (user == null || user.isAnonymous) {
+              showAuthRequiredDialog(context);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const CartScreen()),
+              );
+            }
+          },
         ),
         IconButton(
           icon: const Icon(Icons.chat_bubble_outline, color: AppColors.greyDark),
           onPressed: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (context) => const ChatListScreen()),
-            );
+            final user = FirebaseAuth.instance.currentUser;
+            if (user == null || user.isAnonymous) {
+              showAuthRequiredDialog(context);
+            } else {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => const ChatListScreen()),
+              );
+            }
           },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBanner() {
+    return Column(
+      children: [
+        CarouselSlider.builder(
+          itemCount: _bannerImages.length,
+          itemBuilder: (context, index, realIndex) {
+            return Image.network(_bannerImages[index], fit: BoxFit.cover, width: double.infinity);
+          },
+          options: CarouselOptions(
+            height: 150,
+            autoPlay: true,
+            viewportFraction: 1.0,
+            onPageChanged: (index, reason) {
+              setState(() {
+                _currentBannerIndex = index;
+              });
+            },
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: List.generate(_bannerImages.length, (index) {
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 300),
+              margin: const EdgeInsets.symmetric(horizontal: 4),
+              height: 8,
+              width: _currentBannerIndex == index ? 24 : 8,
+              decoration: BoxDecoration(
+                color: _currentBannerIndex == index ? AppColors.primaryRed : AppColors.grey,
+                borderRadius: BorderRadius.circular(12),
+              ),
+            );
+          }),
         ),
       ],
     );
@@ -149,7 +236,7 @@ class _HomeScreenState extends State<HomeScreen> {
             crossAxisCount: 2,
             crossAxisSpacing: 16,
             mainAxisSpacing: 16,
-            childAspectRatio: 0.7, // Điều chỉnh để thẻ cao hơn
+            childAspectRatio: 0.7,
           ),
           itemCount: snapshot.data!.docs.length,
           itemBuilder: (context, index) {
