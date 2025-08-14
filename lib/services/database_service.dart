@@ -2,14 +2,24 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vietmall/models/category_model.dart';
 import 'package:vietmall/models/product_model.dart';
+import 'package:vietmall/screens/product/product_list_screen.dart';
+
 class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Lấy danh mục (real-time)
   Stream<QuerySnapshot> getCategories() {
     return _firestore.collection('categories').orderBy('name').snapshots();
   }
 
+  // Lấy danh mục (một lần)
+  Future<List<CategoryModel>> getCategoriesList() async {
+    QuerySnapshot snapshot = await _firestore.collection('categories').orderBy('name').get();
+    return snapshot.docs.map((doc) => CategoryModel.fromFirestore(doc)).toList();
+  }
+
+  // Lấy sản phẩm mới nhất
   Stream<QuerySnapshot> getRecentProducts({int limit = 10}) {
     return _firestore
         .collection('products')
@@ -18,35 +28,12 @@ class DatabaseService {
         .snapshots();
   }
 
+  // Lấy thông tin chi tiết một sản phẩm
   Future<DocumentSnapshot> getProductById(String productId) {
     return _firestore.collection('products').doc(productId).get();
   }
 
-  Future<DocumentSnapshot> getUserById(String userId) {
-    return _firestore.collection('users').doc(userId).get();
-  }
-
-  Future<List<CategoryModel>> getCategoriesList() async {
-    QuerySnapshot snapshot = await _firestore.collection('categories').orderBy('name').get();
-    return snapshot.docs.map((doc) => CategoryModel.fromFirestore(doc)).toList();
-  }
-
-  Stream<QuerySnapshot> getProductsByCategory(String categoryId) {
-    return _firestore
-        .collection('products')
-        .where('categoryId', isEqualTo: categoryId)
-        .orderBy('createdAt', descending: true)
-        .snapshots();
-  }
-
-  // Lấy danh sách sản phẩm theo tên (cho chức năng tìm kiếm)
-  Stream<QuerySnapshot> searchProductsByName(String query) {
-    return _firestore
-        .collection('products')
-        .where('title', isGreaterThanOrEqualTo: query)
-        .where('title', isLessThanOrEqualTo: query + '\uf8ff')
-        .snapshots();
-  }
+  // Lấy các sản phẩm khác của cùng người bán
   Stream<QuerySnapshot> getOtherProductsFromSeller(String sellerId, String currentProductId) {
     return _firestore
         .collection('products')
@@ -55,6 +42,47 @@ class DatabaseService {
         .limit(10)
         .snapshots();
   }
+
+  // Lấy thông tin người dùng
+  Future<DocumentSnapshot> getUserById(String userId) {
+    return _firestore.collection('users').doc(userId).get();
+  }
+
+  // Lọc và sắp xếp sản phẩm
+  Stream<QuerySnapshot> getFilteredProducts({
+    String? categoryId,
+    String? searchQuery,
+    PriceSortOption sortOption = PriceSortOption.none,
+  }) {
+    Query query = _firestore.collection('products');
+
+    if (categoryId != null) {
+      query = query.where('categoryId', isEqualTo: categoryId);
+    }
+    if (searchQuery != null) {
+      query = query
+          .where('title', isGreaterThanOrEqualTo: searchQuery)
+          .where('title', isLessThanOrEqualTo: searchQuery + '\uf8ff')
+          .orderBy('title');
+    }
+
+    switch (sortOption) {
+      case PriceSortOption.lowToHigh:
+        query = query.orderBy('price', descending: false);
+        break;
+      case PriceSortOption.highToLow:
+        query = query.orderBy('price', descending: true);
+        break;
+      case PriceSortOption.none:
+      default:
+        query = query.orderBy('createdAt', descending: true);
+        break;
+    }
+
+    return query.snapshots();
+  }
+
+  // --- Chức năng Giỏ hàng ---
   Future<void> addToCart(ProductModel product, {int quantity = 1}) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -65,18 +93,23 @@ class DatabaseService {
         .collection('cart')
         .doc(product.id);
 
-    await cartItemRef.set({
-      'productId': product.id,
-      'title': product.title,
-      'price': product.price,
-      'imageUrl': product.imageUrls.isNotEmpty ? product.imageUrls.first : '',
-      'sellerName': product.sellerName,
-      'quantity': quantity,
-      'addedAt': Timestamp.now(),
-    }, SetOptions(merge: true));
+    final doc = await cartItemRef.get();
+
+    if (doc.exists) {
+      await cartItemRef.update({'quantity': FieldValue.increment(quantity)});
+    } else {
+      await cartItemRef.set({
+        'productId': product.id,
+        'title': product.title,
+        'price': product.price,
+        'imageUrl': product.imageUrls.isNotEmpty ? product.imageUrls.first : '',
+        'sellerName': product.sellerName,
+        'quantity': quantity,
+        'addedAt': Timestamp.now(),
+      });
+    }
   }
 
-  // Lấy các sản phẩm trong giỏ hàng
   Stream<QuerySnapshot> getCartItems() {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return const Stream.empty();
@@ -89,7 +122,6 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Cập nhật số lượng
   Future<void> updateCartItemQuantity(String cartItemId, int newQuantity) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -102,7 +134,6 @@ class DatabaseService {
         .update({'quantity': newQuantity});
   }
 
-  // Xóa các sản phẩm khỏi giỏ hàng
   Future<void> removeCartItems(List<String> cartItemIds) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
@@ -118,7 +149,8 @@ class DatabaseService {
     }
     await batch.commit();
   }
-  // Kiểm tra xem sản phẩm có trong danh sách yêu thích không
+
+  // --- Chức năng Yêu thích ---
   Stream<bool> isFavorite(String productId) {
     final currentUser = _auth.currentUser;
     if (currentUser == null || currentUser.isAnonymous) return Stream.value(false);
@@ -132,7 +164,6 @@ class DatabaseService {
         .map((snapshot) => snapshot.exists);
   }
 
-  // Thêm/Xóa sản phẩm khỏi danh sách yêu thích
   Future<void> toggleFavoriteStatus(ProductModel product) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null || currentUser.isAnonymous) return;
@@ -161,7 +192,6 @@ class DatabaseService {
     }
   }
 
-  // Lấy danh sách sản phẩm yêu thích
   Stream<QuerySnapshot> getFavoriteProducts() {
     final currentUser = _auth.currentUser;
     if (currentUser == null || currentUser.isAnonymous) return const Stream.empty();
@@ -174,8 +204,7 @@ class DatabaseService {
         .snapshots();
   }
 
-
-  // Lấy danh sách các bài đăng trên feed
+  // --- Chức năng Dạo (Feed) ---
   Stream<QuerySnapshot> getFeedPosts() {
     return _firestore
         .collection('feed_posts')
@@ -183,7 +212,7 @@ class DatabaseService {
         .snapshots();
   }
 
-  // Hàm đăng sản phẩm mới (ĐÃ CẬP NHẬT)
+  // --- Chức năng Đăng tin ---
   Future<String?> createProduct({
     required String title,
     required String description,
@@ -193,7 +222,7 @@ class DatabaseService {
     required String sellerName,
     required String categoryId,
     required String categoryName,
-    required bool postToFeed, // Thêm
+    required bool postToFeed,
   }) async {
     try {
       final newProductRef = _firestore.collection('products').doc();
@@ -210,7 +239,6 @@ class DatabaseService {
         'createdAt': Timestamp.now(),
       });
 
-      // Nếu người dùng chọn đăng lên feed
       if (postToFeed) {
         await _firestore.collection('feed_posts').add({
           'productId': newProductRef.id,

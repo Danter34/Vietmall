@@ -4,6 +4,9 @@ import 'package:vietmall/models/product_model.dart';
 import 'package:vietmall/screens/home/widgets/product_card.dart';
 import 'package:vietmall/services/database_service.dart';
 
+// Enum để định nghĩa các tùy chọn sắp xếp
+enum PriceSortOption { none, lowToHigh, highToLow }
+
 class ProductListScreen extends StatefulWidget {
   final String? categoryId;
   final String? categoryName;
@@ -23,23 +26,62 @@ class ProductListScreen extends StatefulWidget {
 class _ProductListScreenState extends State<ProductListScreen> {
   final DatabaseService _databaseService = DatabaseService();
 
+  late Stream<QuerySnapshot> _productStream;
+  PriceSortOption _sortOption = PriceSortOption.none;
+
+  @override
+  void initState() {
+    super.initState();
+    _applyFilters();
+  }
+
+  void _applyFilters() {
+    setState(() {
+      _productStream = _databaseService.getFilteredProducts(
+        categoryId: widget.categoryId,
+        searchQuery: widget.searchQuery,
+        sortOption: _sortOption,
+      );
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final String appBarTitle = widget.searchQuery != null ? 'Kết quả cho "${widget.searchQuery}"' : widget.categoryName!;
-    final Stream<QuerySnapshot> productStream = widget.searchQuery != null
-        ? _databaseService.searchProductsByName(widget.searchQuery!)
-        : _databaseService.getProductsByCategory(widget.categoryId!);
 
     return Scaffold(
       appBar: AppBar(
         title: Text(appBarTitle),
+        actions: [
+          PopupMenuButton<PriceSortOption>(
+            icon: const Icon(Icons.sort),
+            onSelected: (PriceSortOption result) {
+              setState(() {
+                _sortOption = result;
+                _applyFilters();
+              });
+            },
+            itemBuilder: (BuildContext context) => <PopupMenuEntry<PriceSortOption>>[
+              const PopupMenuItem<PriceSortOption>(
+                value: PriceSortOption.none,
+                child: Text('Mặc định'),
+              ),
+              const PopupMenuItem<PriceSortOption>(
+                value: PriceSortOption.lowToHigh,
+                child: Text('Giá: Thấp đến Cao'),
+              ),
+              const PopupMenuItem<PriceSortOption>(
+                value: PriceSortOption.highToLow,
+                child: Text('Giá: Cao đến Thấp'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
-        stream: productStream,
+        stream: _productStream,
         builder: (context, snapshot) {
-          if (snapshot.hasError) {
-            return const Center(child: Text("Đã có lỗi xảy ra."));
-          }
+          if (snapshot.hasError) return const Center(child: Text("Đã có lỗi xảy ra. Vui lòng tạo chỉ mục trên Firebase."));
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }

@@ -65,6 +65,8 @@ class _CartScreenState extends State<CartScreen> {
 
   Widget _buildCartItem(String docId, Map<String, dynamic> data) {
     final isSelected = _selectedItems.contains(docId);
+    final imageUrl = data['imageUrl'] as String?;
+
     return Container(
       padding: const EdgeInsets.all(12),
       margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
@@ -86,11 +88,19 @@ class _CartScreenState extends State<CartScreen> {
               });
             },
           ),
-          Container(
+          SizedBox(
             width: 80,
             height: 80,
-            color: AppColors.greyLight,
-            // child: Image.network(data['imageUrl']),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(
+                imageUrl,
+                fit: BoxFit.cover,
+                errorBuilder: (c, o, s) => Container(color: AppColors.greyLight),
+              )
+                  : Container(color: AppColors.greyLight),
+            ),
           ),
           const SizedBox(width: 12),
           Expanded(
