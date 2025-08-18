@@ -5,6 +5,7 @@ import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/models/product_model.dart';
 import 'package:vietmall/screens/chat/chat_room_screen.dart';
 import 'package:vietmall/screens/home/widgets/product_card.dart';
+import 'package:vietmall/screens/profile/edit_product_screen.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/database_service.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
@@ -34,20 +35,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Future<void> _fetchProductDetails() async {
     try {
       final doc = await _databaseService.getProductById(widget.productId);
-      if (doc.exists) {
+      if (doc.exists && mounted) {
         setState(() {
           _product = ProductModel.fromFirestore(doc);
           _isLoading = false;
         });
       } else {
-        setState(() {
-          _isLoading = false;
-        });
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
@@ -316,15 +313,23 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ? [
           Expanded(
             child: OutlinedButton.icon(
-              onPressed: () {},
-              icon: const Icon(Icons.visibility_off_outlined),
-              label: const Text("Ẩn tin"),
+              onPressed: () {
+                _databaseService.toggleProductVisibility(product.id, product.isHidden);
+                Navigator.of(context).pop(); // Quay về trang trước sau khi ẩn
+              },
+              icon: Icon(product.isHidden ? Icons.visibility_outlined : Icons.visibility_off_outlined),
+              label: Text(product.isHidden ? "Hiện tin" : "Ẩn tin"),
             ),
           ),
           const SizedBox(width: 12),
           Expanded(
             child: ElevatedButton.icon(
-              onPressed: () {},
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (context) => EditProductScreen(product: product)),
+                );
+              },
               icon: const Icon(Icons.edit_outlined),
               label: const Text("Sửa tin"),
             ),

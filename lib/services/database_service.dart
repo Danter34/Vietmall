@@ -15,14 +15,18 @@ class DatabaseService {
 
   // Lấy danh mục (một lần)
   Future<List<CategoryModel>> getCategoriesList() async {
-    QuerySnapshot snapshot = await _firestore.collection('categories').orderBy('name').get();
-    return snapshot.docs.map((doc) => CategoryModel.fromFirestore(doc)).toList();
+    QuerySnapshot snapshot = await _firestore.collection('categories').orderBy(
+        'name').get();
+    return snapshot.docs
+        .map((doc) => CategoryModel.fromFirestore(doc))
+        .toList();
   }
 
-  // Lấy sản phẩm mới nhất
+  // Cập nhật các hàm lấy sản phẩm để lọc ra các sản phẩm đã ẩn
   Stream<QuerySnapshot> getRecentProducts({int limit = 10}) {
     return _firestore
         .collection('products')
+        .where('isHidden', isEqualTo: false) // Lọc
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .snapshots();
@@ -34,9 +38,11 @@ class DatabaseService {
   }
 
   // Lấy các sản phẩm khác của cùng người bán
-  Stream<QuerySnapshot> getOtherProductsFromSeller(String sellerId, String currentProductId) {
+  Stream<QuerySnapshot> getOtherProductsFromSeller(String sellerId,
+      String currentProductId) {
     return _firestore
         .collection('products')
+        .where('isHidden', isEqualTo: false)
         .where('sellerId', isEqualTo: sellerId)
         .where(FieldPath.documentId, isNotEqualTo: currentProductId)
         .limit(10)
@@ -54,7 +60,7 @@ class DatabaseService {
     String? searchQuery,
     PriceSortOption sortOption = PriceSortOption.none,
   }) {
-    Query query = _firestore.collection('products');
+    Query query = _firestore.collection('products').where('isHidden', isEqualTo: false);
 
     if (categoryId != null) {
       query = query.where('categoryId', isEqualTo: categoryId);
@@ -80,6 +86,13 @@ class DatabaseService {
     }
 
     return query.snapshots();
+  }
+
+  // Hàm mới để ẩn/hiện tin
+  Future<void> toggleProductVisibility(String productId,
+      bool currentStatus) async {
+    await _firestore.collection('products').doc(productId).update(
+        {'isHidden': !currentStatus});
   }
 
   // --- Chức năng Giỏ hàng ---
@@ -122,7 +135,8 @@ class DatabaseService {
         .snapshots();
   }
 
-  Future<void> updateCartItemQuantity(String cartItemId, int newQuantity) async {
+  Future<void> updateCartItemQuantity(String cartItemId,
+      int newQuantity) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
@@ -150,10 +164,111 @@ class DatabaseService {
     await batch.commit();
   }
 
+  // Tạo đơn hàng mới
+  Future<void> createOrder({
+    required List<Map<String, dynamic>> items,
+    required double totalPrice,
+    required Map<String, String> shippingAddress,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    final orderRef = _firestore.collection('orders').doc();
+
+    await orderRef.set({
+      'orderId': orderRef.id,
+      'userId': currentUser.uid,
+      'items': items,
+      'totalPrice': totalPrice,
+      'shippingAddress': shippingAddress,
+      'status': 'Đang xử lý', // trạng thái ban đầu
+      'createdAt': Timestamp.now(),
+    });
+
+    // Xóa các sản phẩm đã đặt khỏi giỏ hàng
+    final cartItemIds =
+    items.map((item) => item['productId'] as String).toList();
+    await removeCartItems(cartItemIds);
+  }
+
+  // Lấy danh sách đơn hàng theo trạng thái
+  Stream<QuerySnapshot> getOrders(List<String> statuses) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return const Stream.empty();
+
+    Query query = _firestore
+        .collection('orders')
+        .where('userId', isEqualTo: currentUser.uid)
+        .orderBy('createdAt', descending: true);
+
+    // Chỉ filter status nếu có truyền
+    if (statuses.isNotEmpty) {
+      query = query.where('status', whereIn: statuses);
+    }
+
+    return query.snapshots();
+  }
+
+  // Hủy đơn hàng
+  Future<void> cancelOrder(String orderId) async {
+    await _firestore
+        .collection('orders')
+        .doc(orderId)
+        .update({'status': 'Đã hủy'});
+  }
+
+  // Lấy danh sách sản phẩm của người dùng hiện tại
+  Stream<QuerySnapshot> getMyProducts() {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return const Stream.empty();
+
+    return _firestore
+        .collection('products')
+        .where('sellerId', isEqualTo: currentUser.uid)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // Cập nhật sản phẩm
+  Future<String?> updateProduct({
+    required String productId,
+    required String title,
+    required String description,
+    required double price,
+    required String categoryId,
+    required String categoryName,
+  }) async {
+    try {
+      await _firestore.collection('products').doc(productId).update({
+        'title': title,
+        'description': description,
+        'price': price,
+        'categoryId': categoryId,
+        'categoryName': categoryName,
+        'isHidden': false,
+      });
+      return null;
+    } catch (e) {
+      return e.toString();
+    }
+  }
+
+  // Xóa sản phẩm
+  Future<void> deleteProduct(String productId) async {
+    await _firestore.collection('products').doc(productId).delete();
+    // Tùy chọn: Xóa cả bài đăng trên feed nếu có
+    QuerySnapshot feedPost = await _firestore.collection('feed_posts').where(
+        'productId', isEqualTo: productId).get();
+    for (var doc in feedPost.docs) {
+      await doc.reference.delete();
+    }
+  }
+
   // --- Chức năng Yêu thích ---
   Stream<bool> isFavorite(String productId) {
     final currentUser = _auth.currentUser;
-    if (currentUser == null || currentUser.isAnonymous) return Stream.value(false);
+    if (currentUser == null || currentUser.isAnonymous)
+      return Stream.value(false);
 
     return _firestore
         .collection('users')
@@ -194,12 +309,14 @@ class DatabaseService {
 
   Stream<QuerySnapshot> getFavoriteProducts() {
     final currentUser = _auth.currentUser;
-    if (currentUser == null || currentUser.isAnonymous) return const Stream.empty();
+    if (currentUser == null || currentUser.isAnonymous)
+      return const Stream.empty();
 
     return _firestore
         .collection('users')
         .doc(currentUser.uid)
         .collection('favorites')
+        .where('isHidden', isEqualTo: false)
         .orderBy('savedAt', descending: true)
         .snapshots();
   }
@@ -208,6 +325,7 @@ class DatabaseService {
   Stream<QuerySnapshot> getFeedPosts() {
     return _firestore
         .collection('feed_posts')
+        .where('isHidden', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .snapshots();
   }
@@ -237,6 +355,7 @@ class DatabaseService {
         'categoryId': categoryId,
         'categoryName': categoryName,
         'createdAt': Timestamp.now(),
+        'isHidden': false, // ✅ thêm mặc định
       });
 
       if (postToFeed) {
@@ -249,6 +368,7 @@ class DatabaseService {
           'sellerId': sellerId,
           'sellerName': sellerName,
           'createdAt': Timestamp.now(),
+          'isHidden': false, // ✅ thêm mặc định
         });
       }
 

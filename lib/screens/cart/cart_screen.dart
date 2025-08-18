@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/services/database_service.dart';
+import 'package:vietmall/screens/checkout/checkout_screen.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -31,15 +32,18 @@ class _CartScreenState extends State<CartScreen> {
                   _selectedItems.clear();
                 });
               },
-              child: const Text("Xóa", style: TextStyle(color: AppColors.primaryRed)),
+              child: const Text(
+                  "Xóa", style: TextStyle(color: AppColors.primaryRed)),
             ),
         ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _databaseService.getCartItems(),
         builder: (context, snapshot) {
-          if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
-          if (snapshot.data!.docs.isEmpty) return const Center(child: Text("Giỏ hàng của bạn đang trống."));
+          if (!snapshot.hasData)
+            return const Center(child: CircularProgressIndicator());
+          if (snapshot.data!.docs.isEmpty)
+            return const Center(child: Text("Giỏ hàng của bạn đang trống."));
 
           final cartDocs = snapshot.data!.docs;
 
@@ -97,7 +101,8 @@ class _CartScreenState extends State<CartScreen> {
                   ? Image.network(
                 imageUrl,
                 fit: BoxFit.cover,
-                errorBuilder: (c, o, s) => Container(color: AppColors.greyLight),
+                errorBuilder: (c, o, s) =>
+                    Container(color: AppColors.greyLight),
               )
                   : Container(color: AppColors.greyLight),
             ),
@@ -107,9 +112,11 @@ class _CartScreenState extends State<CartScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(data['sellerName'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                Text(data['sellerName'],
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
                 Text(data['title']),
-                Text(formatter.format(data['price']), style: const TextStyle(color: AppColors.primaryRed)),
+                Text(formatter.format(data['price']),
+                    style: const TextStyle(color: AppColors.primaryRed)),
               ],
             ),
           ),
@@ -124,19 +131,24 @@ class _CartScreenState extends State<CartScreen> {
       children: [
         IconButton(
           icon: const Icon(Icons.remove),
-          onPressed: quantity > 1 ? () => _databaseService.updateCartItemQuantity(docId, quantity - 1) : null,
+          onPressed: quantity > 1
+              ? () =>
+              _databaseService.updateCartItemQuantity(docId, quantity - 1)
+              : null,
         ),
         Text(quantity.toString()),
         IconButton(
           icon: const Icon(Icons.add),
-          onPressed: () => _databaseService.updateCartItemQuantity(docId, quantity + 1),
+          onPressed: () =>
+              _databaseService.updateCartItemQuantity(docId, quantity + 1),
         ),
       ],
     );
   }
 
   Widget _buildBottomBar(List<QueryDocumentSnapshot> cartDocs) {
-    bool isAllSelected = cartDocs.isNotEmpty && _selectedItems.length == cartDocs.length;
+    bool isAllSelected = cartDocs.isNotEmpty &&
+        _selectedItems.length == cartDocs.length;
 
     double totalPrice = 0;
     for (var doc in cartDocs) {
@@ -150,7 +162,9 @@ class _CartScreenState extends State<CartScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -174,10 +188,29 @@ class _CartScreenState extends State<CartScreen> {
           ),
           Row(
             children: [
-              Text("Tổng: ${formatter.format(totalPrice)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+              Text("Tổng: ${formatter.format(totalPrice)}",
+                  style: const TextStyle(
+                      fontWeight: FontWeight.bold, fontSize: 16)),
               const SizedBox(width: 12),
               ElevatedButton(
-                onPressed: _selectedItems.isEmpty ? null : () {},
+                onPressed: _selectedItems.isEmpty ? null : () {
+                  // Lấy danh sách các sản phẩm đã chọn
+                  final selectedProducts = cartDocs
+                      .where((doc) => _selectedItems.contains(doc.id))
+                      .map((doc) => doc.data() as Map<String, dynamic>)
+                      .toList();
+
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          CheckoutScreen(
+                            cartItems: selectedProducts,
+                            totalPrice: totalPrice,
+                          ),
+                    ),
+                  );
+                },
                 child: const Text("Mua hàng"),
               ),
             ],

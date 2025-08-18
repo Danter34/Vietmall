@@ -10,6 +10,10 @@ class ProductModel {
   final String sellerId;
   final String sellerName;
 
+  final String categoryId;
+  final String categoryName;
+  final bool isHidden;
+
   ProductModel({
     required this.id,
     required this.title,
@@ -19,6 +23,9 @@ class ProductModel {
     required this.createdAt,
     required this.sellerId,
     required this.sellerName,
+    required this.categoryId,
+    required this.categoryName,
+    required this.isHidden,
   });
 
   factory ProductModel.fromFirestore(DocumentSnapshot doc) {
@@ -32,6 +39,9 @@ class ProductModel {
       createdAt: data['createdAt'] ?? Timestamp.now(),
       sellerId: data['sellerId'] ?? '',
       sellerName: data['sellerName'] ?? '',
+      categoryId: data['categoryId'] ?? '',
+      categoryName: data['categoryName'] ?? '',
+      isHidden: data['isHidden'] ?? false,
     );
   }
 
@@ -46,6 +56,9 @@ class ProductModel {
       createdAt: data['createdAt'] ?? Timestamp.now(),
       sellerId: data['sellerId'] ?? '',
       sellerName: data['sellerName'] ?? '',
+      categoryId: data['categoryId'] ?? '',
+      categoryName: data['categoryName'] ?? '',
+      isHidden: data['isHidden'] ?? false,
     );
   }
 }
