@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/services/auth_service.dart';
+import 'package:intl/intl.dart';
 
 class RegisterScreen extends StatefulWidget {
   final VoidCallback showLoginPage;
@@ -17,6 +18,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _birthDateController = TextEditingController();
+  DateTime? _selectedBirthDate;
   bool _isLoading = false;
   bool _isPasswordVisible = false;
   bool _isConfirmPasswordVisible = false;
@@ -28,35 +31,71 @@ class _RegisterScreenState extends State<RegisterScreen> {
     _emailController.dispose();
     _passwordController.dispose();
     _confirmPasswordController.dispose();
+    _birthDateController.dispose();
     super.dispose();
   }
 
+  Future<void> _selectDate(BuildContext context) async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null && picked != _selectedBirthDate) {
+      setState(() {
+        _selectedBirthDate = picked;
+        _birthDateController.text = DateFormat('dd/MM/yyyy').format(picked);
+      });
+    }
+  }
+
   Future<void> _register() async {
+    if (!_agreedToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng đồng ý với Điều khoản và Chính sách bảo mật.")),
+      );
+      return;
+    }
+
     if (_formKey.currentState!.validate()) {
-      if (!_agreedToTerms) {
+      // Kiểm tra tuổi
+      if (_selectedBirthDate != null) {
+        final age = DateTime.now().difference(_selectedBirthDate!).inDays / 365;
+        if (age < 16) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text("Bạn phải đủ 16 tuổi để đăng ký.")),
+          );
+          return;
+        }
+      } else {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Vui lòng đồng ý với điều khoản sử dụng.")),
+          const SnackBar(content: Text("Vui lòng chọn ngày sinh.")),
         );
         return;
       }
 
-      setState(() { _isLoading = true; });
+      setState(() {
+        _isLoading = true;
+      });
 
       final authService = AuthService();
       String? result = await authService.registerWithEmailAndPassword(
         _emailController.text.trim(),
         _passwordController.text.trim(),
         _fullNameController.text.trim(),
+        _selectedBirthDate!,
       );
 
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() {
+          _isLoading = false;
+        });
         if (result != null) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(result), backgroundColor: Colors.red),
           );
         } else {
-          // Đăng ký thành công, chuyển sang trang đăng nhập
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Đăng ký thành công! Vui lòng đăng nhập.")),
           );
@@ -91,7 +130,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text("Đăng ký tài khoản", style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                const Text(
+                  "Đăng ký tài khoản",
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+                ),
                 const SizedBox(height: 32),
                 TextFormField(
                   controller: _fullNameController,
@@ -111,13 +153,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
                 TextFormField(
+                  controller: _birthDateController,
+                  decoration: const InputDecoration(
+                    labelText: 'Ngày sinh',
+                    suffixIcon: Icon(Icons.calendar_today),
+                  ),
+                  readOnly: true,
+                  onTap: () => _selectDate(context),
+                ),
+                const SizedBox(height: 16),
+                TextFormField(
                   controller: _passwordController,
                   obscureText: !_isPasswordVisible,
                   decoration: InputDecoration(
                     labelText: 'Mật khẩu',
                     suffixIcon: IconButton(
-                      icon: Icon(_isPasswordVisible ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _isPasswordVisible = !_isPasswordVisible),
+                      icon: Icon(_isPasswordVisible
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () =>
+                          setState(() => _isPasswordVisible = !_isPasswordVisible),
                     ),
                   ),
                   validator: (v) {
@@ -133,8 +188,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   decoration: InputDecoration(
                     labelText: 'Xác nhận mật khẩu',
                     suffixIcon: IconButton(
-                      icon: Icon(_isConfirmPasswordVisible ? Icons.visibility_off : Icons.visibility),
-                      onPressed: () => setState(() => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
+                      icon: Icon(_isConfirmPasswordVisible
+                          ? Icons.visibility_off
+                          : Icons.visibility),
+                      onPressed: () => setState(
+                              () => _isConfirmPasswordVisible = !_isConfirmPasswordVisible),
                     ),
                   ),
                   validator: (v) {
@@ -149,7 +207,9 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   width: double.infinity,
                   child: ElevatedButton(
                     onPressed: _isLoading ? null : _register,
-                    child: _isLoading ? const CircularProgressIndicator(color: Colors.white) : const Text('ĐĂNG KÝ'),
+                    child: _isLoading
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text('ĐĂNG KÝ'),
                   ),
                 ),
                 const SizedBox(height: 32),
@@ -157,7 +217,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 const SizedBox(height: 24),
                 _buildSocialLoginButtons(),
                 const SizedBox(height: 48),
-                _buildSwitchPageLink("Đã có tài khoản?", " Đăng nhập", widget.showLoginPage),
+                _buildSwitchPageLink(
+                    "Đã có tài khoản?", " Đăng nhập", widget.showLoginPage),
               ],
             ),
           ),
@@ -205,7 +266,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
         Expanded(child: Divider()),
         Padding(
           padding: EdgeInsets.symmetric(horizontal: 8.0),
-          child: Text("Hoặc đăng nhập bằng", style: TextStyle(color: AppColors.greyDark)),
+          child: Text("Hoặc đăng nhập bằng",
+              style: TextStyle(color: AppColors.greyDark)),
         ),
         Expanded(child: Divider()),
       ],
@@ -216,16 +278,32 @@ class _RegisterScreenState extends State<RegisterScreen> {
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        _socialButton(icon: Icons.facebook, label: "Facebook", onTap: () {}, iconColor: const Color(0xFF1877F2)),
+        _socialButton(
+            icon: Icons.facebook,
+            label: "Facebook",
+            onTap: () {},
+            iconColor: const Color(0xFF1877F2)),
         const SizedBox(width: 16),
-        _socialButton(icon: Icons.g_mobiledata, label: "Google", onTap: () {}, iconColor: Colors.red),
+        _socialButton(
+            icon: Icons.g_mobiledata,
+            label: "Google",
+            onTap: () {},
+            iconColor: Colors.red),
         const SizedBox(width: 16),
-        _socialButton(icon: Icons.message, label: "Zalo", onTap: () {}, iconColor: const Color(0xFF0068FF)),
+        _socialButton(
+            icon: Icons.message,
+            label: "Zalo",
+            onTap: () {},
+            iconColor: const Color(0xFF0068FF)),
       ],
     );
   }
 
-  Widget _socialButton({required IconData icon, required String label, required VoidCallback onTap, required Color iconColor}) {
+  Widget _socialButton(
+      {required IconData icon,
+        required String label,
+        required VoidCallback onTap,
+        required Color iconColor}) {
     return OutlinedButton.icon(
       onPressed: onTap,
       icon: Icon(icon, color: iconColor),

@@ -9,7 +9,8 @@ import 'package:vietmall/screens/profile/edit_product_screen.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/database_service.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
-
+import 'package:vietmall/widgets/star_rating.dart';
+import 'package:vietmall/screens/profile/public_profile_screen.dart';
 class ProductDetailScreen extends StatefulWidget {
   final String productId;
   const ProductDetailScreen({super.key, required this.productId});
@@ -21,6 +22,13 @@ class ProductDetailScreen extends StatefulWidget {
 class _ProductDetailScreenState extends State<ProductDetailScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
+  final _reviewController = TextEditingController();
+  double _userRating = 0;
+  @override
+  void dispose() {
+    _reviewController.dispose();
+    super.dispose();
+    }
 
   ProductModel? _product;
   bool _isLoading = true;
@@ -68,6 +76,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                 const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
                 _buildDescription(_product!),
                 const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
+                _buildReviewsSection(_product!.id), // Thêm mục đánh giá
+                const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
                 _buildOtherProducts(_product!.sellerId, _product!.id, _product!.sellerName),
               ],
             ),
@@ -77,7 +87,101 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       bottomNavigationBar: _product == null ? null : _buildBottomBar(_product!),
     );
   }
+  Widget _buildReviewsSection(String productId) {
+    return Padding(
+      padding: const EdgeInsets.all(16.0),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text("Đánh giá & Bình luận", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const SizedBox(height: 16),
+          _buildReviewInput(productId),
+          const SizedBox(height: 16),
+          StreamBuilder<QuerySnapshot>(
+            stream: _databaseService.getReviews(productId),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+              if (snapshot.data!.docs.isEmpty) return const Text("Chưa có đánh giá nào.");
 
+              return ListView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                itemCount: snapshot.data!.docs.length,
+                itemBuilder: (context, index) {
+                  final review = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                  return _buildReviewItem(review);
+                },
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildReviewInput(String productId) {
+    final user = AuthService().currentUser;
+    if (user == null || user.isAnonymous) {
+      return const Text("Vui lòng đăng nhập để để lại đánh giá.");
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text("Đánh giá của bạn:"),
+        StarRatingInput(
+          rating: _userRating,
+          onRatingChanged: (rating) => setState(() => _userRating = rating),
+        ),
+        const SizedBox(height: 8),
+        TextField(
+          controller: _reviewController,
+          decoration: const InputDecoration(
+            hintText: "Viết bình luận của bạn...",
+            border: OutlineInputBorder(),
+          ),
+          maxLines: 3,
+        ),
+        const SizedBox(height: 8),
+        ElevatedButton(
+          onPressed: () {
+            if (_userRating > 0 && _reviewController.text.isNotEmpty) {
+              _databaseService.addReview(
+                productId: productId,
+                rating: _userRating,
+                comment: _reviewController.text,
+              );
+              _reviewController.clear();
+              setState(() => _userRating = 0);
+            }
+          },
+          child: const Text("Gửi đánh giá"),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildReviewItem(Map<String, dynamic> review) {
+    return Card(
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Text(review['userName'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                StarRating(rating: (review['rating'] as num).toDouble()),
+              ],
+            ),
+            const SizedBox(height: 4),
+            Text(review['comment']),
+          ],
+        ),
+      ),
+    );
+  }
   SliverAppBar _buildSliverAppBar(ProductModel product) {
     return SliverAppBar(
       expandedHeight: 300.0,
@@ -205,9 +309,31 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Row(
         children: [
-          const CircleAvatar(
-            radius: 24,
-            backgroundColor: AppColors.greyLight,
+          // StreamBuilder để lấy avatar của seller
+          StreamBuilder<DocumentSnapshot>(
+            stream: DatabaseService().getUserProfile(sellerId),
+            builder: (context, snapshot) {
+              if (!snapshot.hasData) {
+                return const CircleAvatar(
+                  radius: 24,
+                  backgroundColor: AppColors.greyLight,
+                );
+              }
+
+              final userData = snapshot.data!.data() as Map<String, dynamic>?;
+              final avatarUrl = userData?['avatarUrl'] as String?;
+
+              return CircleAvatar(
+                radius: 24,
+                backgroundColor: AppColors.greyLight,
+                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                    ? NetworkImage(avatarUrl)
+                    : null,
+                child: (avatarUrl == null || avatarUrl.isEmpty)
+                    ? const Icon(Icons.person, color: Colors.white)
+                    : null,
+              );
+            },
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -220,12 +346,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
           OutlinedButton(
-            onPressed: () {},
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PublicProfileScreen(userId: sellerId)),
+              );
+            },
             child: const Text("Xem trang"),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: AppColors.primaryRed,
-              side: const BorderSide(color: AppColors.primaryRed),
-            ),
           ),
         ],
       ),

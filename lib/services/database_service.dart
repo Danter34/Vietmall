@@ -267,8 +267,9 @@ class DatabaseService {
   // --- Chức năng Yêu thích ---
   Stream<bool> isFavorite(String productId) {
     final currentUser = _auth.currentUser;
-    if (currentUser == null || currentUser.isAnonymous)
+    if (currentUser == null || currentUser.isAnonymous) {
       return Stream.value(false);
+    }
 
     return _firestore
         .collection('users')
@@ -276,7 +277,11 @@ class DatabaseService {
         .collection('favorites')
         .doc(productId)
         .snapshots()
-        .map((snapshot) => snapshot.exists);
+        .map((snapshot) {
+      final data = snapshot.data();
+      // nếu document tồn tại và không bị ẩn thì mới coi là favorite
+      return snapshot.exists && (data?['isHidden'] == false);
+    });
   }
 
   Future<void> toggleFavoriteStatus(ProductModel product) async {
@@ -292,7 +297,12 @@ class DatabaseService {
     final doc = await favoriteRef.get();
 
     if (doc.exists) {
-      await favoriteRef.delete();
+      // toggle trạng thái isHidden
+      final currentHidden = doc.data()?['isHidden'] ?? false;
+      await favoriteRef.update({
+        'isHidden': !currentHidden,
+        'savedAt': Timestamp.now(),
+      });
     } else {
       await favoriteRef.set({
         'title': product.title,
@@ -303,14 +313,16 @@ class DatabaseService {
         'description': product.description,
         'createdAt': product.createdAt,
         'savedAt': Timestamp.now(),
+        'isHidden': false, // mặc định chưa ẩn
       });
     }
   }
 
   Stream<QuerySnapshot> getFavoriteProducts() {
     final currentUser = _auth.currentUser;
-    if (currentUser == null || currentUser.isAnonymous)
+    if (currentUser == null || currentUser.isAnonymous) {
       return const Stream.empty();
+    }
 
     return _firestore
         .collection('users')
@@ -321,7 +333,199 @@ class DatabaseService {
         .snapshots();
   }
 
-  // --- Chức năng Dạo (Feed) ---
+  // Lấy danh sách đánh giá của một sản phẩm
+  Stream<QuerySnapshot> getReviews(String productId) {
+    return _firestore
+        .collection('products')
+        .doc(productId)
+        .collection('reviews')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  // Thêm một đánh giá mới
+  Future<void> addReview({
+    required String productId,
+    required double rating,
+    required String comment,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.isAnonymous) return;
+
+    await _firestore
+        .collection('products')
+        .doc(productId)
+        .collection('reviews')
+        .add({
+      'rating': rating,
+      'comment': comment,
+      'userId': currentUser.uid,
+      'userName': currentUser.displayName ?? 'Người dùng',
+      'createdAt': Timestamp.now(),
+    });
+  }
+  // --- Chức năng Hồ sơ Công khai & Theo dõi ---
+  Future<void> updateUserProfile({
+    required String fullName,
+    required DateTime birthDate,
+    required String address,
+    required String avatarUrl,
+    required String coverUrl,
+  }) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    await currentUser.updateDisplayName(fullName);
+    await _firestore.collection('users').doc(currentUser.uid).update({
+      'fullName': fullName,
+      'birthDate': Timestamp.fromDate(birthDate),
+      'address': address,
+      'avatarUrl': avatarUrl,
+      'coverUrl': coverUrl,
+    });
+  }
+  // Lấy thông tin chi tiết của một người dùng
+  Stream<DocumentSnapshot> getUserProfile(String userId) {
+    return _firestore.collection('users').doc(userId).snapshots();
+  }
+
+  Stream<QuerySnapshot> getProductsBySeller(String sellerId) {
+    return _firestore
+        .collection('products')
+        .where('sellerId', isEqualTo: sellerId)
+        .where('isHidden', isEqualTo: false)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
+
+  Stream<int> getFollowerCount(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('followers')
+        .snapshots()
+        .map((snapshot) => snapshot.size);
+  }
+
+  Stream<int> getFollowingCount(String userId) {
+    return _firestore
+        .collection('users')
+        .doc(userId)
+        .collection('following')
+        .snapshots()
+        .map((snapshot) => snapshot.size);
+  }
+
+  Stream<bool> isFollowing(String otherUserId) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.isAnonymous) return Stream.value(false);
+
+    return _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('following')
+        .doc(otherUserId)
+        .snapshots()
+        .map((snapshot) => snapshot.exists);
+  }
+
+  Future<void> toggleFollowStatus(String otherUserId) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null || currentUser.isAnonymous) return;
+
+    final followingRef = _firestore
+        .collection('users')
+        .doc(currentUser.uid)
+        .collection('following')
+        .doc(otherUserId);
+
+    final followerRef = _firestore
+        .collection('users')
+        .doc(otherUserId)
+        .collection('followers')
+        .doc(currentUser.uid);
+
+    final doc = await followingRef.get();
+    final batch = _firestore.batch();
+
+    if (doc.exists) {
+      batch.delete(followingRef);
+      batch.delete(followerRef);
+    } else {
+      batch.set(followingRef, {'followedAt': Timestamp.now()});
+      batch.set(followerRef, {'followedAt': Timestamp.now()});
+    }
+
+    await batch.commit();
+  }
+  //xoa
+  Future<void> deleteAllUserData(String userId) async {
+    final batch = _firestore.batch();
+
+    // 1️⃣ Xóa document chính của user
+    final userDoc = _firestore.collection('users').doc(userId);
+    batch.delete(userDoc);
+
+    // 2️⃣ Xóa giỏ hàng
+    final cartSnapshot = await userDoc.collection('cart').get();
+    for (var doc in cartSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // 3️⃣ Xóa favorites
+    final favSnapshot = await userDoc.collection('favorites').get();
+    for (var doc in favSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // 4️⃣ Xóa followers
+    final followersSnapshot = await userDoc.collection('followers').get();
+    for (var doc in followersSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // 5️⃣ Xóa following
+    final followingSnapshot = await userDoc.collection('following').get();
+    for (var doc in followingSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // 6️⃣ Xóa products của user
+    final productsSnapshot = await _firestore
+        .collection('products')
+        .where('sellerId', isEqualTo: userId)
+        .get();
+    for (var doc in productsSnapshot.docs) {
+      // Xóa sản phẩm trên feed_posts nếu có
+      final feedSnapshot = await _firestore
+          .collection('feed_posts')
+          .where('productId', isEqualTo: doc.id)
+          .get();
+      for (var feedDoc in feedSnapshot.docs) {
+        batch.delete(feedDoc.reference);
+      }
+      batch.delete(doc.reference);
+    }
+
+    // 7️⃣ Xóa đơn hàng của user
+    final ordersSnapshot = await _firestore
+        .collection('orders')
+        .where('userId', isEqualTo: userId)
+        .get();
+    for (var doc in ordersSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // Commit batch
+    await batch.commit();
+
+    // 8️⃣ Xóa user trên Authentication
+    final currentUser = _auth.currentUser;
+    if (currentUser != null && currentUser.uid == userId) {
+      await currentUser.delete();
+    }
+  }
+// --- Chức năng Dạo (Feed) ---
   Stream<QuerySnapshot> getFeedPosts() {
     return _firestore
         .collection('feed_posts')

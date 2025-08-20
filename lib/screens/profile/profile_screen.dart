@@ -7,8 +7,8 @@ import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
 import 'package:vietmall/screens/orders/my_orders_screen.dart';
 import 'package:vietmall/screens/profile/manage_listings_screen.dart';
-
-
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:vietmall/screens/profile/settings_screen.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -82,7 +82,17 @@ class ProfileScreen extends StatelessWidget {
               ),
 
               _buildSectionTitle("Khác"),
-              _buildOptionTile(Icons.settings_outlined, "Cài đặt tài khoản"),
+              _buildOptionTile(
+                Icons.settings_outlined,
+                "Cài đặt tài khoản",
+                onTap: () {
+                  if (isLoggedIn) {
+                    Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+                  } else {
+                    showAuthRequiredDialog(context);
+                  }
+                },
+              ),
               _buildOptionTile(Icons.help_outline, "Trợ giúp"),
               _buildOptionTile(Icons.feedback_outlined, "Đóng góp ý kiến"),
 
@@ -102,25 +112,50 @@ class ProfileScreen extends StatelessWidget {
   }
 
   Widget _buildUserInfo(BuildContext context, User user) {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          const CircleAvatar(radius: 30, backgroundColor: AppColors.greyLight),
-          const SizedBox(width: 16),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        final userData = snapshot.data!.data() as Map<String, dynamic>?;
+
+        final avatarUrl = userData?['avatarUrl'] ?? user.photoURL;
+
+        return Padding(
+          padding: const EdgeInsets.all(16.0),
+          child: Row(
             children: [
-              Text(
-                user.displayName ?? "Người dùng",
-                style:
-                const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              CircleAvatar(
+                radius: 30,
+                backgroundColor: AppColors.greyLight,
+                backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                child: avatarUrl == null
+                    ? const Icon(Icons.person, size: 30, color: Colors.white)
+                    : null,
               ),
-              Text(user.email ?? "Chưa có email"),
+              const SizedBox(width: 16),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    userData?['fullName'] ?? user.displayName ?? "Người dùng",
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text(user.email ?? "Chưa có email"),
+                ],
+              ),
             ],
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -136,7 +171,15 @@ class ProfileScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: Row(
           children: [
-            const CircleAvatar(radius: 30, backgroundColor: AppColors.greyLight),
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: AppColors.greyLight,
+              child: const Icon(
+                Icons.person,
+                size: 30,
+                color: Colors.white,
+              ),
+            ),
             const SizedBox(width: 16),
             const Text(
               "Đăng nhập / Đăng ký",

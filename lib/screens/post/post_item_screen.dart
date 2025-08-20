@@ -42,6 +42,9 @@ class _PostItemScreenState extends State<PostItemScreen> {
       setState(() {
         _isCategoriesLoading = false;
       });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Lỗi khi tải danh mục: $e")),
+      );
     }
   }
 
@@ -62,24 +65,49 @@ class _PostItemScreenState extends State<PostItemScreen> {
         .where((url) => url.isNotEmpty)
         .toList();
 
-    if (_formKey.currentState!.validate() && imageUrls.isNotEmpty && _selectedCategory != null) {
-      setState(() { _isLoading = true; });
+    if (!_formKey.currentState!.validate()) return;
+    if (_selectedCategory == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng chọn danh mục.")),
+      );
+      return;
+    }
+    if (imageUrls.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng nhập ít nhất 1 URL hình ảnh.")),
+      );
+      return;
+    }
 
-      final authService = AuthService();
-      final currentUser = authService.currentUser;
+    double? price;
+    try {
+      price = double.parse(_priceController.text);
+      if (price <= 0) throw FormatException("Giá phải lớn hơn 0");
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Giá không hợp lệ. Vui lòng nhập số.")),
+      );
+      return;
+    }
 
-      if (currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text("Vui lòng đăng nhập để đăng tin.")),
-        );
-        setState(() { _isLoading = false; });
-        return;
-      }
+    setState(() => _isLoading = true);
 
+    final authService = AuthService();
+    final currentUser = authService.currentUser;
+
+    if (currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Vui lòng đăng nhập để đăng tin.")),
+      );
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    try {
       String? result = await _databaseService.createProduct(
         title: _titleController.text,
         description: _descriptionController.text,
-        price: double.parse(_priceController.text),
+        price: price,
         imageUrls: imageUrls,
         sellerId: currentUser.uid,
         sellerName: currentUser.displayName ?? "Người dùng VietMall",
@@ -89,7 +117,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
       );
 
       if (mounted) {
-        setState(() { _isLoading = false; });
+        setState(() => _isLoading = false);
         if (result == null) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text("Đăng tin thành công!")),
@@ -101,8 +129,11 @@ class _PostItemScreenState extends State<PostItemScreen> {
           );
         }
       }
-    } else {
-      // ... handle validation error ...
+    } catch (e) {
+      if (mounted) setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Lỗi khi đăng tin: $e")),
+      );
     }
   }
 
@@ -122,27 +153,23 @@ class _PostItemScreenState extends State<PostItemScreen> {
             children: [
               _buildImageUrlInputs(),
               const SizedBox(height: 24),
-
               _isCategoriesLoading
                   ? const Center(child: CircularProgressIndicator())
                   : DropdownButtonFormField<CategoryModel>(
                 value: _selectedCategory,
                 hint: const Text("Chọn danh mục *"),
-                items: _categories.map((CategoryModel category) {
-                  return DropdownMenuItem<CategoryModel>(
-                    value: category,
-                    child: Text(category.name),
-                  );
-                }).toList(),
+                items: _categories
+                    .map((CategoryModel category) => DropdownMenuItem<CategoryModel>(
+                  value: category,
+                  child: Text(category.name),
+                ))
+                    .toList(),
                 onChanged: (CategoryModel? newValue) {
-                  setState(() {
-                    _selectedCategory = newValue;
-                  });
+                  setState(() => _selectedCategory = newValue);
                 },
                 validator: (value) => value == null ? 'Vui lòng chọn danh mục' : null,
               ),
               const SizedBox(height: 16),
-
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: "Tiêu đề tin đăng *"),
@@ -160,18 +187,19 @@ class _PostItemScreenState extends State<PostItemScreen> {
                 controller: _priceController,
                 decoration: const InputDecoration(labelText: "Giá bán *", suffixText: "₫"),
                 keyboardType: TextInputType.number,
-                validator: (v) => v!.isEmpty ? "Vui lòng nhập giá" : null,
+                validator: (v) {
+                  if (v == null || v.isEmpty) return 'Vui lòng nhập giá';
+                  if (double.tryParse(v) == null) return 'Giá không hợp lệ';
+                  if (double.parse(v) <= 0) return 'Giá phải lớn hơn 0';
+                  return null;
+                },
               ),
               const SizedBox(height: 16),
               SwitchListTile(
                 title: const Text("Đăng lên Dạo"),
                 subtitle: const Text("Sản phẩm của bạn sẽ xuất hiện trên trang Dạo của mọi người."),
                 value: _postToFeed,
-                onChanged: (bool value) {
-                  setState(() {
-                    _postToFeed = value;
-                  });
-                },
+                onChanged: (bool value) => setState(() => _postToFeed = value),
               ),
               const SizedBox(height: 32),
               _isLoading
@@ -192,7 +220,8 @@ class _PostItemScreenState extends State<PostItemScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("URL Hình ảnh sản phẩm *", style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text("URL Hình ảnh sản phẩm *",
+            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
         const SizedBox(height: 8),
         ListView.builder(
           shrinkWrap: true,

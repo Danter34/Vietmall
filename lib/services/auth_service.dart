@@ -1,6 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-
+import 'package:vietmall/services/database_service.dart';
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -10,7 +10,7 @@ class AuthService {
   User? get currentUser => _auth.currentUser;
 
   Future<String?> registerWithEmailAndPassword(
-      String email, String password, String fullName) async {
+      String email, String password, String fullName, DateTime birthDate) async {
     try {
       UserCredential result = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -22,6 +22,7 @@ class AuthService {
         await _firestore.collection('users').doc(user.uid).set({
           'fullName': fullName,
           'email': email,
+          'birthDate': Timestamp.fromDate(birthDate), // Lưu ngày sinh
           'createdAt': Timestamp.now(),
         });
       }
@@ -38,6 +39,52 @@ class AuthService {
         email: email,
         password: password,
       );
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return e.message;
+    }
+  }
+  Future<String?> changePassword({
+    required String currentPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return "Người dùng không tồn tại.";
+
+      // Xác thực lại người dùng với mật khẩu cũ
+      final cred = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(cred);
+
+      // Nếu xác thực thành công, đổi mật khẩu mới
+      await user.updatePassword(newPassword);
+      return null;
+    } on FirebaseAuthException catch (e) {
+      return e.message;
+    }
+  }
+
+  Future<String?> deleteUserAccount(String currentPassword) async {
+    try {
+      final user = _auth.currentUser;
+      if (user == null) return "Người dùng không tồn tại.";
+
+      // Xác thực lại trước khi xóa
+      final cred = EmailAuthProvider.credential(
+        email: user.email!,
+        password: currentPassword,
+      );
+      await user.reauthenticateWithCredential(cred);
+
+      // Xóa dữ liệu trên Firestore
+      await DatabaseService().deleteAllUserData(user.uid);
+
+      // Xóa tài khoản trên Authentication
+      await user.delete();
+
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;

@@ -7,7 +7,7 @@ import 'package:vietmall/screens/product/product_detail_screen.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/database_service.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
-
+import 'package:vietmall/screens/profile/public_profile_screen.dart';
 class FeedPostCard extends StatelessWidget {
   final Map<String, dynamic> postData;
   const FeedPostCard({super.key, required this.postData});
@@ -23,7 +23,7 @@ class FeedPostCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildHeader(),
+          _buildHeader(context),
           _buildImage(context, product.id),
           _buildProductInfo(context, formatter, product.id),
           Padding(
@@ -36,19 +36,27 @@ class FeedPostCard extends StatelessWidget {
     );
   }
 
-  Widget _buildHeader() {
+  Widget _buildHeader(BuildContext context) { // Thêm context
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
         children: [
           const CircleAvatar(backgroundColor: AppColors.greyLight),
           const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(postData['sellerName'] ?? 'Người bán', style: const TextStyle(fontWeight: FontWeight.bold)),
-              const Text("21 giờ trước", style: TextStyle(color: Colors.grey, fontSize: 12)),
-            ],
+          InkWell(
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (context) => PublicProfileScreen(userId: postData['sellerId'])),
+              );
+            },
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(postData['sellerName'] ?? 'Người bán', style: const TextStyle(fontWeight: FontWeight.bold)),
+                const Text("21 giờ trước", style: TextStyle(color: Colors.grey, fontSize: 12)),
+              ],
+            ),
           ),
           const Spacer(),
           OutlinedButton(

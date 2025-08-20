@@ -5,7 +5,7 @@ import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/screens/chat/chat_room_screen.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/chat_service.dart';
-
+import 'package:vietmall/services/database_service.dart';
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
 
@@ -97,9 +97,30 @@ class _ChatListScreenState extends State<ChatListScreen> {
     String formattedTime = DateFormat('HH:mm').format(timestamp.toDate());
 
     return ListTile(
-      leading: const CircleAvatar(
-        radius: 28,
-        backgroundColor: AppColors.greyLight,
+      leading: StreamBuilder<DocumentSnapshot>(
+        stream: DatabaseService().getUserProfile(otherUserId),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData) {
+            return const CircleAvatar(
+              radius: 28,
+              backgroundColor: AppColors.greyLight,
+            );
+          }
+
+          final userData = snapshot.data!.data() as Map<String, dynamic>?;
+          final avatarUrl = userData?['avatarUrl'] as String?;
+
+          return CircleAvatar(
+            radius: 28,
+            backgroundColor: AppColors.greyLight,
+            backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                ? NetworkImage(avatarUrl)
+                : null,
+            child: (avatarUrl == null || avatarUrl.isEmpty)
+                ? const Icon(Icons.person, color: Colors.white)
+                : null,
+          );
+        },
       ),
       title: Row(
         children: [
