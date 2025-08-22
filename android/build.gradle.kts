@@ -1,3 +1,7 @@
+// Thêm các import cần thiết ở đầu file
+import org.gradle.api.JavaVersion
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 allprojects {
     repositories {
         google()
@@ -18,4 +22,15 @@ subprojects {
 
 tasks.register<Delete>("clean") {
     delete(rootProject.layout.buildDirectory)
+}
+
+// DÁN ĐOẠN CODE NÀY VÀO CUỐI FILE CỦA BẠN
+allprojects {
+    tasks.withType(JavaCompile::class.java) {
+        sourceCompatibility = JavaVersion.VERSION_17.toString()
+        targetCompatibility = JavaVersion.VERSION_17.toString()
+    }
+    tasks.withType(org.jetbrains.kotlin.gradle.tasks.KotlinCompile::class.java) {
+        kotlinOptions.jvmTarget = "17"
+    }
 }

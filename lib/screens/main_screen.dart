@@ -21,7 +21,7 @@ class _MainScreenState extends State<MainScreen> {
     const HomeScreen(),
     const FeedScreen(),
     const Center(child: Text('Thông báo')),
-    const ProfileScreen(), // Sử dụng ProfileScreen mới
+    const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -45,60 +45,105 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _widgetOptions,
-      ),
-      bottomNavigationBar: BottomAppBar(
-        shape: const CircularNotchedRectangle(),
-        notchMargin: 8.0,
-        color: AppColors.white,
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceAround,
-          children: <Widget>[
-            _buildNavItem(icon: Icons.home_outlined, label: 'Trang chủ', index: 0),
-            _buildNavItem(icon: Icons.shopping_bag_outlined, label: 'Dạo', index: 1),
-            const SizedBox(width: 40),
-            _buildNavItem(icon: Icons.notifications_none_outlined, label: 'Thông báo', index: 2),
-            _buildNavItem(icon: Icons.person_outline, label: 'Tài khoản', index: 3),
-          ],
-        ),
-      ),
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerDocked,
-      floatingActionButton: SizedBox(
-        width: 65,
-        height: 65,
-        child: FloatingActionButton(
-          onPressed: _navigateToPostScreen,
-          backgroundColor: AppColors.primaryRed,
-          foregroundColor: AppColors.white,
-          elevation: 2.0,
-          shape: const CircleBorder(),
-          child: const Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.add, size: 28),
-              Text("Đăng tin", style: TextStyle(fontSize: 9)),
-            ],
+      // Giữ thuộc tính này, nó vẫn hữu ích
+      resizeToAvoidBottomInset: false,
+      // Bỏ floatingActionButton và floatingActionButtonLocation
+      // Thay vào đó, body sẽ là một Stack
+      body: Stack(
+        children: [
+          // Lớp 1: Nội dung chính của bạn (luôn nằm dưới cùng)
+          IndexedStack(
+            index: _selectedIndex,
+            children: _widgetOptions,
           ),
-        ),
+
+          // Lớp 2: Thanh điều hướng và nút bấm (luôn nằm trên cùng và ở dưới đáy)
+          Positioned(
+            left: 0,
+            right: 0,
+            bottom: 0,
+            child: _buildBottomNavWithFab(),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildNavItem({required IconData icon, required String label, required int index}) {
+  // Widget mới để chứa cả BottomAppBar và nút FAB
+  Widget _buildBottomNavWithFab() {
+    return Stack(
+      // Cho phép nút FAB vẽ ra ngoài phạm vi của BottomAppBar
+      clipBehavior: Clip.none,
+      alignment: Alignment.center,
+      children: [
+        // Lớp nền: BottomAppBar của bạn
+        BottomAppBar(
+          shape: const CircularNotchedRectangle(),
+          notchMargin: 8.0,
+          color: Colors.white,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            children: <Widget>[
+              _buildNavItem("assets/main/home.png", "Trang chủ", 0),
+              _buildNavItem("assets/main/daoviet.png", "Dạo VietMall", 1),
+              const SizedBox(width: 40), // chừa chỗ cho nút đăng tin
+              _buildNavItem("assets/main/Group.png", "Thông báo", 2),
+              _buildNavItem("assets/main/user.png", "Tài khoản", 3),
+            ],
+          ),
+        ),
+        // Lớp trên: Nút Đăng tin (giữ nguyên Transform của bạn)
+        Transform(
+          transform: Matrix4.translationValues(5, -15, 0),
+          child: GestureDetector(
+            onTap: _navigateToPostScreen,
+            child: Container(
+              width: 68,
+              height: 68,
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                shape: BoxShape.circle,
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(4.0),
+                child: ClipOval(
+                  child: Image.asset(
+                    "assets/main/dt.png",
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildNavItem(String assetPath, String label, int index) {
     final isSelected = _selectedIndex == index;
     return InkWell(
       onTap: () => _onItemTapped(index),
       borderRadius: BorderRadius.circular(20),
       child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+        padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: isSelected ? AppColors.primaryRed : AppColors.greyDark),
+            Image.asset(
+              assetPath,
+              width: 24,
+              height: 24,
+              color: isSelected ? AppColors.primaryRed : AppColors.greyDark,
+            ),
             const SizedBox(height: 2),
-            Text(label, style: TextStyle(color: isSelected ? AppColors.primaryRed : AppColors.greyDark, fontSize: 11)),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                color: isSelected ? AppColors.primaryRed : AppColors.greyDark,
+              ),
+            ),
           ],
         ),
       ),
