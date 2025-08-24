@@ -61,6 +61,10 @@ class ChatService {
         },
         'lastMessage': message,
         'lastMessageTimestamp': timestamp,
+        'unread': {
+          receiverId: FieldValue.increment(1), // tăng cho người nhận
+          currentUserId: 0, // người gửi đã đọc rồi
+        }
       }, SetOptions(merge: true));
 
       DocumentReference newMessage = chatRoom.collection('messages').doc();

@@ -9,6 +9,9 @@ import 'package:vietmall/screens/orders/my_orders_screen.dart';
 import 'package:vietmall/screens/profile/manage_listings_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vietmall/screens/profile/settings_screen.dart';
+import 'package:vietmall/screens/orders/my_sales_screen.dart';
+import 'package:vietmall/screens/profile/public_profile_screen.dart';
+
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -37,16 +40,31 @@ class ProfileScreen extends StatelessWidget {
               _buildOptionCard(
                 Icons.shopping_basket_outlined,
                 "Đơn mua",
-
                 onTap: () {
-                  if (isLoggedIn){
+                  if (isLoggedIn) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const MyOrdersScreen(),
                       ),
                     );
-                  }else {
+                  } else {
+                    showAuthRequiredDialog(context);
+                  }
+                },
+              ),
+              const SizedBox(height: 8),
+              _buildOptionCard(
+                Icons.storefront_outlined,
+                "Đơn bán",
+                onTap: () {
+                  if (isLoggedIn) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const MySalesScreen()),
+                    );
+                  } else {
                     showAuthRequiredDialog(context);
                   }
                 },
@@ -58,7 +76,11 @@ class ProfileScreen extends StatelessWidget {
                 "Quản lý tin",
                 onTap: () {
                   if (isLoggedIn) {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const ManageListingsScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) =>
+                            const ManageListingsScreen()));
                   } else {
                     showAuthRequiredDialog(context);
                   }
@@ -87,7 +109,10 @@ class ProfileScreen extends StatelessWidget {
                 "Cài đặt tài khoản",
                 onTap: () {
                   if (isLoggedIn) {
-                    Navigator.push(context, MaterialPageRoute(builder: (context) => const SettingsScreen()));
+                    Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const SettingsScreen()));
                   } else {
                     showAuthRequiredDialog(context);
                   }
@@ -100,7 +125,32 @@ class ProfileScreen extends StatelessWidget {
                 Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: OutlinedButton(
-                    onPressed: () => AuthService().signOut(),
+                    onPressed: () async {
+                      final confirm = await showDialog<bool>(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: const Text("Xác nhận"),
+                          content:
+                          const Text("Bạn có chắc chắn muốn đăng xuất không?"),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.pop(context, false),
+                              child: const Text("Hủy"),
+                            ),
+                            ElevatedButton(
+                              onPressed: () => Navigator.pop(context, true),
+                              style: ElevatedButton.styleFrom(
+                                  backgroundColor: AppColors.primaryRed),
+                              child: const Text("Đăng xuất"),
+                            ),
+                          ],
+                        ),
+                      );
+
+                      if (confirm == true) {
+                        await AuthService().signOut();
+                      }
+                    },
                     child: const Text("Đăng xuất"),
                   ),
                 ),
@@ -113,46 +163,56 @@ class ProfileScreen extends StatelessWidget {
 
   Widget _buildUserInfo(BuildContext context, User user) {
     return StreamBuilder<DocumentSnapshot>(
-      stream: FirebaseFirestore.instance
-          .collection('users')
-          .doc(user.uid)
-          .snapshots(),
+      stream:
+      FirebaseFirestore.instance.collection('users').doc(user.uid).snapshots(),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
 
         final userData = snapshot.data!.data() as Map<String, dynamic>?;
-
         final avatarUrl = userData?['avatarUrl'] ?? user.photoURL;
 
-        return Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 30,
-                backgroundColor: AppColors.greyLight,
-                backgroundImage: avatarUrl != null ? NetworkImage(avatarUrl) : null,
-                child: avatarUrl == null
-                    ? const Icon(Icons.person, size: 30, color: Colors.white)
-                    : null,
-              ),
-              const SizedBox(width: 16),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    userData?['fullName'] ?? user.displayName ?? "Người dùng",
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
+        return InkWell(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (context) =>
+                      PublicProfileScreen(userId: user.uid)),
+            );
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: Row(
+              children: [
+                CircleAvatar(
+                  radius: 30,
+                  backgroundColor: AppColors.greyLight,
+                  backgroundImage:
+                  avatarUrl != null ? NetworkImage(avatarUrl) : null,
+                  child: avatarUrl == null
+                      ? const Icon(Icons.person, size: 30, color: Colors.white)
+                      : null,
+                ),
+                const SizedBox(width: 16),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      userData?['fullName'] ??
+                          user.displayName ??
+                          "Người dùng",
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  Text(user.email ?? "Chưa có email"),
-                ],
-              ),
-            ],
+                    Text(user.email ?? "Chưa có email"),
+                  ],
+                ),
+              ],
+            ),
           ),
         );
       },
@@ -204,7 +264,6 @@ class ProfileScreen extends StatelessWidget {
     );
   }
 
-  /// ✅ Fix: thêm [onTap] để dùng khi gọi hàm
   Widget _buildOptionCard(IconData icon, String title, {VoidCallback? onTap}) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16),

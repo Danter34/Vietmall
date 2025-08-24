@@ -25,15 +25,17 @@ class CheckoutScreen extends StatefulWidget {
 class _CheckoutScreenState extends State<CheckoutScreen> {
   final formatter = NumberFormat.currency(locale: 'vi_VN', symbol: '₫');
   Map<String, String> _shippingAddress = {
-    'name': 'Sơn Sói',
-    'phone': '(+84) 012355465',
-    'address': '27, Tôn Thất Tùng, Phường 8, Đà Lạt',
+    'name': '',
+    'phone': '',
+    'address': '',
   };
   ShippingOption _selectedShipping = ShippingOption.fast; // Mặc định là Nhanh
 
   @override
   Widget build(BuildContext context) {
-    double shippingFee = _selectedShipping == ShippingOption.fast ? 50000 : 30000;
+    double shippingFee = _selectedShipping == ShippingOption.fast
+        ? 50000
+        : 30000;
     double finalTotal = widget.totalPrice + shippingFee;
 
     return Scaffold(
@@ -57,7 +59,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildAddressSection() {
     return ListTile(
-      leading: const Icon(Icons.location_on_outlined, color: AppColors.primaryRed),
+      leading: const Icon(
+          Icons.location_on_outlined, color: AppColors.primaryRed),
       title: Text("${_shippingAddress['name']} | ${_shippingAddress['phone']}"),
       subtitle: Text(_shippingAddress['address']!),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
@@ -95,7 +98,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                         ? Image.network(
                       imageUrl,
                       fit: BoxFit.cover,
-                      errorBuilder: (c, o, s) => Container(color: AppColors.greyLight),
+                      errorBuilder: (c, o, s) =>
+                          Container(color: AppColors.greyLight),
                     )
                         : Container(color: AppColors.greyLight),
                   ),
@@ -105,7 +109,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(item['sellerName'], style: const TextStyle(fontWeight: FontWeight.bold)),
+                      Text(item['sellerName'], style: const TextStyle(
+                          fontWeight: FontWeight.bold)),
                       Text(item['title']),
                       Text(formatter.format(item['price'])),
                     ],
@@ -126,7 +131,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Phương thức vận chuyển", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text("Phương thức vận chuyển",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           RadioListTile<ShippingOption>(
             title: const Text('Nhanh'),
             subtitle: Text(formatter.format(50000)),
@@ -164,7 +170,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text("Chi tiết thanh toán", style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+          const Text("Chi tiết thanh toán",
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -185,8 +192,10 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text("Tổng thanh toán", style: TextStyle(fontWeight: FontWeight.bold)),
-              Text(formatter.format(finalTotal), style: const TextStyle(color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
+              const Text("Tổng thanh toán",
+                  style: TextStyle(fontWeight: FontWeight.bold)),
+              Text(formatter.format(finalTotal), style: const TextStyle(
+                  color: AppColors.primaryRed, fontWeight: FontWeight.bold)),
             ],
           ),
         ],
@@ -199,15 +208,35 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: AppColors.white,
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)],
+        boxShadow: [
+          BoxShadow(color: Colors.black.withOpacity(0.1), blurRadius: 10)
+        ],
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.end,
         children: [
-          Text("Tổng cộng: ${formatter.format(finalTotal)}", style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          Text(
+            "Tổng cộng: ${formatter.format(finalTotal)}",
+            style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(width: 12),
           ElevatedButton(
             onPressed: () async {
+              // ✅ Check địa chỉ trước khi cho đặt hàng
+              if (_shippingAddress['name']!.isEmpty ||
+                  _shippingAddress['phone']!.isEmpty ||
+                  _shippingAddress['address']!.isEmpty) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                        "Vui lòng chọn địa chỉ giao hàng trước khi thanh toán."),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+                return; // ❌ Không cho chạy tiếp
+              }
+
+              // ✅ Có địa chỉ thì mới tạo đơn hàng
               await DatabaseService().createOrder(
                 items: widget.cartItems,
                 totalPrice: finalTotal,
@@ -220,7 +249,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 );
 
                 Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(builder: (context) => const MyOrdersScreen()),
+                  MaterialPageRoute(
+                      builder: (context) => const MyOrdersScreen()),
                       (Route<dynamic> route) => route.isFirst,
                 );
               }

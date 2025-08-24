@@ -22,6 +22,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
   final TextEditingController _messageController = TextEditingController();
+  @override
+  void initState() {
+    super.initState();
+
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null) {
+      List<String> ids = [currentUser.uid, widget.receiverId];
+      ids.sort();
+      String chatRoomId = ids.join('_');
+
+      FirebaseFirestore.instance
+          .collection('chat_rooms')
+          .doc(chatRoomId)
+          .set({
+        'unread': {currentUser.uid: 0}
+      }, SetOptions(merge: true));
+    }
+  }
 
   void _sendMessage() async {
     final text = _messageController.text.trim();

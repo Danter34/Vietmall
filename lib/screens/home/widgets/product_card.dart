@@ -66,12 +66,7 @@ class ProductCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: const Icon(Icons.more_horiz, size: 20, color: AppColors.greyDark),
-                        padding: EdgeInsets.zero,
-                        constraints: const BoxConstraints(),
-                      )
+
                     ],
                   ),
                 ],

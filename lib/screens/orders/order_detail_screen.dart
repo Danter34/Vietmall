@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:vietmall/common/app_colors.dart';
+import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/database_service.dart';
 
 class OrderDetailScreen extends StatelessWidget {
@@ -24,6 +25,10 @@ class OrderDetailScreen extends StatelessWidget {
           final data = snapshot.data!.data() as Map<String, dynamic>;
           final items = data['items'] as List;
           final address = data['shippingAddress'] as Map<String, dynamic>;
+
+          // Kiểm tra xem người dùng hiện tại có phải là người mua không
+          final currentUser = AuthService().currentUser;
+          final bool isBuyer = currentUser?.uid == data['userId'];
 
           return ListView(
             padding: const EdgeInsets.all(16),
@@ -52,7 +57,8 @@ class OrderDetailScreen extends StatelessWidget {
                 ],
               ),
               const SizedBox(height: 32),
-              if (data['status'] == 'Đang xử lý')
+              // Chỉ hiển thị nút Hủy nếu là người mua và đơn hàng đang xử lý
+              if (isBuyer && data['status'] == 'Đang xử lý')
                 ElevatedButton(
                   onPressed: () {
                     DatabaseService().cancelOrder(orderId);

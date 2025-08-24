@@ -33,7 +33,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   ProductModel? _product;
   bool _isLoading = true;
   int _currentImageIndex = 0;
-
+  String _sellerAddress = "Chưa cập nhật";
   @override
   void initState() {
     super.initState();
@@ -44,10 +44,13 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     try {
       final doc = await _databaseService.getProductById(widget.productId);
       if (doc.exists && mounted) {
+        final product = ProductModel.fromFirestore(doc);
         setState(() {
-          _product = ProductModel.fromFirestore(doc);
+          _product = product;
           _isLoading = false;
         });
+        // --- lấy địa chỉ người bán sau khi có product ---
+        _fetchSellerInfo(product.sellerId);
       } else {
         if (mounted) setState(() => _isLoading = false);
       }
@@ -55,6 +58,46 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (mounted) setState(() => _isLoading = false);
     }
   }
+  // --- thêm: fetch địa chỉ người bán ---
+  Future<void> _fetchSellerInfo(String sellerId) async {
+    try {
+      final userDoc = await _databaseService.getUserById(sellerId);
+      if (userDoc.exists && mounted) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        setState(() {
+          _sellerAddress = (userData['address'] as String?)?.trim().isNotEmpty == true
+              ? userData['address']
+              : "Chưa cập nhật";
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _sellerAddress = "Không thể tải địa chỉ");
+    }
+  }
+
+  // --- thêm: format “đăng X thời gian trước” ---
+  String _formatTimeAgo(Timestamp timestamp) {
+    final now = DateTime.now();
+    final created = timestamp.toDate();
+    final difference = now.difference(created);
+
+    if (difference.inDays > 365) {
+      return "${(difference.inDays / 365).floor()} năm trước";
+    } else if (difference.inDays > 30) {
+      return "${(difference.inDays / 30).floor()} tháng trước";
+    } else if (difference.inDays > 7) {
+      return "${(difference.inDays / 7).floor()} tuần trước";
+    } else if (difference.inDays > 0) {
+      return "${difference.inDays} ngày trước";
+    } else if (difference.inHours > 0) {
+      return "${difference.inHours} giờ trước";
+    } else if (difference.inMinutes > 0) {
+      return "${difference.inMinutes} phút trước";
+    } else {
+      return "Vài giây trước";
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -286,9 +329,16 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             ),
           ),
           const SizedBox(height: 16),
-          _infoRow(Icons.location_on_outlined, "Địa chỉ người bán..."),
+          // --- dùng địa chỉ thật từ _sellerAddress ---
+          _infoRow(Icons.location_on_outlined, _sellerAddress),
           const SizedBox(height: 8),
-          _infoRow(Icons.timer_outlined, "Đăng 2 tuần trước"),
+          // --- dùng thời gian thật từ createdAt ---
+          _infoRow(
+            Icons.timer_outlined,
+            (product.createdAt is Timestamp)
+                ? _formatTimeAgo(product.createdAt as Timestamp)
+                : "Vừa đăng",
+          ),
         ],
       ),
     );
@@ -299,7 +349,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       children: [
         Icon(icon, color: AppColors.greyDark, size: 18),
         const SizedBox(width: 8),
-        Text(text, style: const TextStyle(color: AppColors.greyDark)),
+        Flexible(child: Text(text, style: const TextStyle(color: AppColors.greyDark))),
       ],
     );
   }

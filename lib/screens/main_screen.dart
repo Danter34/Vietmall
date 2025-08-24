@@ -46,18 +46,20 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       // Giữ thuộc tính này, nó vẫn hữu ích
-      resizeToAvoidBottomInset: false,
+      resizeToAvoidBottomInset: true,
       // Bỏ floatingActionButton và floatingActionButtonLocation
       // Thay vào đó, body sẽ là một Stack
       body: Stack(
         children: [
-          // Lớp 1: Nội dung chính của bạn (luôn nằm dưới cùng)
-          IndexedStack(
-            index: _selectedIndex,
-            children: _widgetOptions,
+          Padding(
+            padding: EdgeInsets.only(
+              bottom: kBottomNavigationBarHeight + 24 + MediaQuery.of(context).padding.bottom,
+            ),
+            child: IndexedStack(
+              index: _selectedIndex,
+              children: _widgetOptions,
+            ),
           ),
-
-          // Lớp 2: Thanh điều hướng và nút bấm (luôn nằm trên cùng và ở dưới đáy)
           Positioned(
             left: 0,
             right: 0,

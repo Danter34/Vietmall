@@ -26,23 +26,26 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       body: Column(
         children: [
-          _buildSearchAndFilterBar(),
           Expanded(
             child: StreamBuilder<QuerySnapshot>(
               stream: _chatService.getChatRooms(),
               builder: (context, snapshot) {
-                if (snapshot.hasError) return const Center(child: Text("Đã có lỗi xảy ra."));
+                if (snapshot.hasError)
+                  return const Center(child: Text("Đã có lỗi xảy ra."));
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
                 if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(child: Text("Bạn chưa có cuộc trò chuyện nào."));
+                  return const Center(
+                      child: Text("Bạn chưa có cuộc trò chuyện nào."));
                 }
 
                 return ListView.separated(
                   itemCount: snapshot.data!.docs.length,
-                  itemBuilder: (context, index) => _buildChatListItem(snapshot.data!.docs[index]),
-                  separatorBuilder: (context, index) => const Divider(height: 1),
+                  itemBuilder: (context, index) =>
+                      _buildChatListItem(snapshot.data!.docs[index]),
+                  separatorBuilder: (context, index) =>
+                  const Divider(height: 1),
                 );
               },
             ),
@@ -52,38 +55,6 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-  Widget _buildSearchAndFilterBar() {
-    return Padding(
-      padding: const EdgeInsets.all(8.0),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              border: Border.all(color: AppColors.grey),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: const Row(
-              children: [
-                Text("Tất cả"),
-                Icon(Icons.arrow_drop_down),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          const Expanded(
-            child: TextField(
-              decoration: InputDecoration(
-                hintText: "Nhập 3 ký tự để tìm kiếm",
-                prefixIcon: Icon(Icons.search),
-                contentPadding: EdgeInsets.symmetric(vertical: 0),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildChatListItem(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
@@ -96,7 +67,13 @@ class _ChatListScreenState extends State<ChatListScreen> {
     Timestamp timestamp = data['lastMessageTimestamp'];
     String formattedTime = DateFormat('HH:mm').format(timestamp.toDate());
 
+    int unreadCount = 0;
+    if (data['unread'] != null) {
+      unreadCount = (data['unread'][currentUserId] ?? 0) as int;
+    }
+
     return ListTile(
+      tileColor: unreadCount > 0 ? Colors.blue.withOpacity(0.1) : null,
       leading: StreamBuilder<DocumentSnapshot>(
         stream: DatabaseService().getUserProfile(otherUserId),
         builder: (context, snapshot) {
@@ -124,25 +101,44 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       title: Row(
         children: [
-          Text(otherUserName, style: const TextStyle(fontWeight: FontWeight.bold)),
+          Text(
+            otherUserName,
+            style: TextStyle(
+              fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
           const SizedBox(width: 8),
-          Text(formattedTime, style: const TextStyle(color: AppColors.greyDark, fontSize: 12)),
+          Text(
+            formattedTime,
+            style: const TextStyle(color: AppColors.greyDark, fontSize: 12),
+          ),
         ],
       ),
-      subtitle: Text(data['lastMessage'], maxLines: 2, overflow: TextOverflow.ellipsis),
-      trailing: Container(
-        width: 50,
-        height: 50,
-        color: AppColors.greyLight,
+      subtitle: Text(
+        data['lastMessage'],
+        maxLines: 2,
+        overflow: TextOverflow.ellipsis,
+        style: TextStyle(
+          fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+        ),
       ),
-      onTap: () {
+      onTap: () async {
+        // khi mở phòng → reset unread
+        await FirebaseFirestore.instance
+            .collection('chat_rooms')
+            .doc(doc.id)
+            .set({
+          'unread': {currentUserId: 0}
+        }, SetOptions(merge: true));
+
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => ChatRoomScreen(
-              receiverId: otherUserId,
-              receiverName: otherUserName,
-            ),
+            builder: (context) =>
+                ChatRoomScreen(
+                  receiverId: otherUserId,
+                  receiverName: otherUserName,
+                ),
           ),
         );
       },

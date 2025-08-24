@@ -3,7 +3,7 @@ import 'package:vietmall/screens/profile/account_info_screen.dart';
 import 'package:vietmall/screens/profile/change_password_screen.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/common/app_colors.dart';
-import 'package:vietmall/screens/home/home_screen.dart'; // HomeScreen của bạn
+import 'package:vietmall/screens/main_screen.dart';
 
 class SettingsScreen extends StatelessWidget {
   const SettingsScreen({super.key});
@@ -19,7 +19,7 @@ class SettingsScreen extends StatelessWidget {
             // user đã xóa hoặc logout → quay về HomeScreen
             Future.microtask(() {
               Navigator.of(context).pushAndRemoveUntil(
-                MaterialPageRoute(builder: (_) => const HomeScreen()),
+                MaterialPageRoute(builder: (_) => const MainScreen()),
                     (route) => false,
               );
             });

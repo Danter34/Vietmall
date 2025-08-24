@@ -116,6 +116,7 @@ class DatabaseService {
         'title': product.title,
         'price': product.price,
         'imageUrl': product.imageUrls.isNotEmpty ? product.imageUrls.first : '',
+        'sellerId': product.sellerId,
         'sellerName': product.sellerName,
         'quantity': quantity,
         'addedAt': Timestamp.now(),
@@ -173,22 +174,36 @@ class DatabaseService {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
+    // Lấy danh sách ID của tất cả người bán trong đơn hàng
+    final sellerIds = items.map((item) => item['sellerId'] as String).toSet().toList();
+
     final orderRef = _firestore.collection('orders').doc();
 
     await orderRef.set({
       'orderId': orderRef.id,
-      'userId': currentUser.uid,
+      'userId': currentUser.uid, // ID người mua
+      'sellerIds': sellerIds, // Danh sách ID người bán
       'items': items,
       'totalPrice': totalPrice,
       'shippingAddress': shippingAddress,
-      'status': 'Đang xử lý', // trạng thái ban đầu
+      'status': 'Đang xử lý',
       'createdAt': Timestamp.now(),
     });
 
-    // Xóa các sản phẩm đã đặt khỏi giỏ hàng
-    final cartItemIds =
-    items.map((item) => item['productId'] as String).toList();
+    final cartItemIds = items.map((item) => item['productId'] as String).toList();
     await removeCartItems(cartItemIds);
+  }
+  // Lấy danh sách đơn bán của bạn
+  Stream<QuerySnapshot> getSalesOrders(List<String> statuses) {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return const Stream.empty();
+
+    return _firestore
+        .collection('orders')
+        .where('sellerIds', arrayContains: currentUser.uid)
+        .where('status', whereIn: statuses)
+        .orderBy('createdAt', descending: true)
+        .snapshots();
   }
 
   // Lấy danh sách đơn hàng theo trạng thái
