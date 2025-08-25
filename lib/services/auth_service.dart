@@ -22,8 +22,10 @@ class AuthService {
         await _firestore.collection('users').doc(user.uid).set({
           'fullName': fullName,
           'email': email,
-          'birthDate': Timestamp.fromDate(birthDate), // Lưu ngày sinh
+          'birthDate': Timestamp.fromDate(birthDate),
           'createdAt': Timestamp.now(),
+          'role': 'user', // Thêm trường role
+          'isActive': true, // Thêm trường isActive
         });
       }
       return null;

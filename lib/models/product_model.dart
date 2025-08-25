@@ -13,6 +13,7 @@ class ProductModel {
   final String categoryId;
   final String categoryName;
   final bool isHidden;
+  final String status;
 
   ProductModel({
     required this.id,
@@ -26,6 +27,7 @@ class ProductModel {
     required this.categoryId,
     required this.categoryName,
     required this.isHidden,
+    required this.status,
   });
 
   factory ProductModel.fromFirestore(DocumentSnapshot doc) {
@@ -42,6 +44,7 @@ class ProductModel {
       categoryId: data['categoryId'] ?? '',
       categoryName: data['categoryName'] ?? '',
       isHidden: data['isHidden'] ?? false,
+        status: data['status'] ?? 'approved'
     );
   }
 
@@ -59,6 +62,7 @@ class ProductModel {
       categoryId: data['categoryId'] ?? '',
       categoryName: data['categoryName'] ?? '',
       isHidden: data['isHidden'] ?? false,
+        status: data['status'] ?? 'approved'
     );
   }
 }

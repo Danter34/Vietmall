@@ -13,6 +13,7 @@ import 'package:vietmall/screens/product/product_list_screen.dart';
 import 'package:vietmall/services/database_service.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
 import 'package:vietmall/widgets/badge_icon_button.dart';
+import 'package:url_launcher/url_launcher.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -23,18 +24,11 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
+
+  late Stream<DocumentSnapshot> _bannerStream;
   int _currentBannerIndex = 0;
 
-  final List<String> _bannerImages = [
-    'https://intphcm.com/data/upload/mau-banner-hinh-anh.jpg',
-    'https://img.freepik.com/free-psd/horizontal-banner-template-big-sale-with-woman-shopping-bags_23-2148786755.jpg',
-    'https://intphcm.com/data/upload/banner-la-gi.jpg',
-    'https://file.hstatic.net/1000190106/file/banner_52c7c95bfca340a39340178942e19f70_1024x1024.jpg',
-    'https://i.ytimg.com/vi/YzRkoQFjrM8/sddefault.jpg',
-  ];
-
   // ----- BẮT ĐẦU FIX LỖI CHỚP-LOAD LẠI -----
-
   // 1. Khai báo biến để lưu các stream
   late Stream<QuerySnapshot> _categoryStream;
   late Stream<QuerySnapshot> _recentProductsStream;
@@ -45,6 +39,10 @@ class _HomeScreenState extends State<HomeScreen> {
     // 2. Lấy stream một lần duy nhất khi màn hình được khởi tạo
     _categoryStream = _databaseService.getCategories();
     _recentProductsStream = _databaseService.getRecentProducts();
+    _bannerStream = FirebaseFirestore.instance
+        .collection('banners')
+        .doc('main_banners') // <-- Trỏ tới document cố định
+        .snapshots();
   }
 
   // ----- KẾT THÚC FIX LỖI CHỚP-LOAD LẠI -----
@@ -54,7 +52,15 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     super.dispose();
   }
-
+  Future<void> _openLink(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } else {
+      // Có thể hiển thị một SnackBar hoặc thông báo lỗi ở đây
+      print("Không thể mở link: $url");
+    }
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -182,56 +188,93 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  /// Widget xây dựng khu vực banner theo mô hình mới
   Widget _buildBanner() {
-    return Column(
-      children: [
-        CarouselSlider.builder(
-          itemCount: _bannerImages.length,
-          itemBuilder: (context, index, realIndex) {
-            return Image.network(_bannerImages[index], fit: BoxFit.cover, width: double.infinity);
-          },
-          options: CarouselOptions(
-            height: 150,
-            autoPlay: true,
-            viewportFraction: 1.0,
-            onPageChanged: (index, reason) {
-              setState(() {
-                _currentBannerIndex = index;
-              });
-            },
-          ),
-        ),
-        const SizedBox(height: 8),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: List.generate(_bannerImages.length, (index) {
-            return AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              margin: const EdgeInsets.symmetric(horizontal: 4),
-              height: 8,
-              width: _currentBannerIndex == index ? 24 : 8,
-              decoration: BoxDecoration(
-                color: _currentBannerIndex == index ? AppColors.primaryRed : AppColors.grey,
-                borderRadius: BorderRadius.circular(12),
-              ),
+    return StreamBuilder<DocumentSnapshot>(
+      stream: _bannerStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+        }
+        if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
+          return const SizedBox(height: 150, child: Center(child: Text("Không có banner")));
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final imageUrls = [
+          data['link1'],
+          data['link2'],
+          data['link3'],
+          data['link4'],
+          data['link5'],
+        ]
+            .where((link) => link != null && link.toString().isNotEmpty)
+            .cast<String>()
+            .toList();
+
+        if (imageUrls.isEmpty) {
+          return const SizedBox(height: 150, child: Center(child: Text("Không có banner")));
+        }
+
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setState) {
+            return Column(
+              children: [
+                CarouselSlider.builder(
+                  itemCount: imageUrls.length,
+                  itemBuilder: (context, index, realIndex) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          imageUrls[index],
+                          fit: BoxFit.cover,
+                          width: double.infinity,
+                          loadingBuilder: (context, child, loadingProgress) {
+                            if (loadingProgress == null) return child;
+                            return const Center(child: CircularProgressIndicator());
+                          },
+                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.error)),
+                        ),
+                      ),
+                    );
+                  },
+                  options: CarouselOptions(
+                    height: 150,
+                    autoPlay: true,
+                    viewportFraction: 1.0,
+                    onPageChanged: (index, reason) {
+                      setState(() {
+                        _currentBannerIndex = index;
+                      });
+                    },
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(imageUrls.length, (index) {
+                    return AnimatedContainer(
+                      duration: const Duration(milliseconds: 300),
+                      margin: const EdgeInsets.symmetric(horizontal: 4),
+                      height: 8,
+                      width: _currentBannerIndex == index ? 24 : 8,
+                      decoration: BoxDecoration(
+                        color: _currentBannerIndex == index ? AppColors.primaryRed : AppColors.grey,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    );
+                  }),
+                ),
+              ],
             );
-          }),
-        ),
-      ],
+          },
+        );
+      },
     );
   }
 
-
-
-  Widget _quickActionButton(IconData icon, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: AppColors.primaryRed, size: 28),
-        const SizedBox(height: 4),
-        Text(label, textAlign: TextAlign.center, style: const TextStyle(fontSize: 12)),
-      ],
-    );
-  }
 
   Widget _buildSectionTitle(String title) {
     return Padding(

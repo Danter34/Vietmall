@@ -26,6 +26,7 @@ class DatabaseService {
   Stream<QuerySnapshot> getRecentProducts({int limit = 10}) {
     return _firestore
         .collection('products')
+        .where('status', isEqualTo: 'approved')
         .where('isHidden', isEqualTo: false) // Lọc
         .orderBy('createdAt', descending: true)
         .limit(limit)
@@ -42,6 +43,7 @@ class DatabaseService {
       String currentProductId) {
     return _firestore
         .collection('products')
+        .where('status', isEqualTo: 'approved')
         .where('isHidden', isEqualTo: false)
         .where('sellerId', isEqualTo: sellerId)
         .where(FieldPath.documentId, isNotEqualTo: currentProductId)
@@ -60,7 +62,7 @@ class DatabaseService {
     String? searchQuery,
     PriceSortOption sortOption = PriceSortOption.none,
   }) {
-    Query query = _firestore.collection('products').where('isHidden', isEqualTo: false);
+    Query query = _firestore.collection('products').where('status', isEqualTo: 'approved').where('isHidden', isEqualTo: false);
 
     if (categoryId != null) {
       query = query.where('categoryId', isEqualTo: categoryId);
@@ -278,7 +280,6 @@ class DatabaseService {
       await doc.reference.delete();
     }
   }
-
   // --- Chức năng Yêu thích ---
   Stream<bool> isFavorite(String productId) {
     final currentUser = _auth.currentUser;
@@ -408,6 +409,7 @@ class DatabaseService {
     return _firestore
         .collection('products')
         .where('sellerId', isEqualTo: sellerId)
+        .where('status', isEqualTo: 'approved')
         .where('isHidden', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .snapshots();
@@ -544,6 +546,7 @@ class DatabaseService {
   Stream<QuerySnapshot> getFeedPosts() {
     return _firestore
         .collection('feed_posts')
+        .where('status', isEqualTo: 'approved')
         .where('isHidden', isEqualTo: false)
         .orderBy('createdAt', descending: true)
         .snapshots();
@@ -574,7 +577,8 @@ class DatabaseService {
         'categoryId': categoryId,
         'categoryName': categoryName,
         'createdAt': Timestamp.now(),
-        'isHidden': false, // ✅ thêm mặc định
+        'isHidden': false, //thêm mặc định
+        'status': 'pending',
       });
 
       if (postToFeed) {
@@ -587,7 +591,8 @@ class DatabaseService {
           'sellerId': sellerId,
           'sellerName': sellerName,
           'createdAt': Timestamp.now(),
-          'isHidden': false, // ✅ thêm mặc định
+          'isHidden': false, //thêm mặc định
+          'status': 'pending',
         });
       }
 
