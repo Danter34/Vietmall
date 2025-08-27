@@ -37,10 +37,22 @@ class AuthService {
   Future<String?> signInWithEmailAndPassword(
       String email, String password) async {
     try {
-      await _auth.signInWithEmailAndPassword(
+      UserCredential result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+      User? user = result.user;
+
+      if (user != null) {
+        // 🔍 Kiểm tra trạng thái isActive trong Firestore
+        final doc = await _firestore.collection('users').doc(user.uid).get();
+        if (doc.exists && !(doc['isActive'] ?? true)) {
+          // Nếu bị khóa thì signOut ngay
+          await _auth.signOut();
+          return "Tài khoản của bạn đã bị khóa";
+        }
+      }
+
       return null;
     } on FirebaseAuthException catch (e) {
       return e.message;

@@ -23,8 +23,8 @@ dependencies:
   intl: ^0.18.1
   carousel_slider: 5.0.0
   url_launcher: ^6.3.2
-  # image_picker: ^1.0.7  <-- XÓA DÒNG NÀY
-  # path: ^1.8.3          <-- XÓA DÒNG NÀY
+  firebase_messaging: ^14.7.10
+  flutter_local_notifications: ^17.2.3
 
 dev_dependencies:
   flutter_test:
@@ -43,3 +43,4 @@ flutter:
     - assets/logo/
     - assets/main/
     - assets/icon/
+    - assets/json/

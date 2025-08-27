@@ -13,7 +13,6 @@ import 'package:vietmall/screens/product/product_list_screen.dart';
 import 'package:vietmall/services/database_service.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
 import 'package:vietmall/widgets/badge_icon_button.dart';
-import 'package:url_launcher/url_launcher.dart';
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -25,13 +24,15 @@ class _HomeScreenState extends State<HomeScreen> {
   final DatabaseService _databaseService = DatabaseService();
   final TextEditingController _searchController = TextEditingController();
 
-  late Stream<DocumentSnapshot> _bannerStream;
-  int _currentBannerIndex = 0;
+
 
   // ----- BẮT ĐẦU FIX LỖI CHỚP-LOAD LẠI -----
+
   // 1. Khai báo biến để lưu các stream
   late Stream<QuerySnapshot> _categoryStream;
   late Stream<QuerySnapshot> _recentProductsStream;
+  late Stream<DocumentSnapshot> _bannerStream;
+  int _currentBannerIndex = 0;
 
   @override
   void initState() {
@@ -41,7 +42,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _recentProductsStream = _databaseService.getRecentProducts();
     _bannerStream = FirebaseFirestore.instance
         .collection('banners')
-        .doc('main_banners') // <-- Trỏ tới document cố định
+        .doc('main_banners')
         .snapshots();
   }
 
@@ -52,38 +53,42 @@ class _HomeScreenState extends State<HomeScreen> {
     _searchController.dispose();
     super.dispose();
   }
-  Future<void> _openLink(String url) async {
-    final uri = Uri.parse(url);
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } else {
-      // Có thể hiển thị một SnackBar hoặc thông báo lỗi ở đây
-      print("Không thể mở link: $url");
-    }
-  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: Container(
-        color: AppColors.white,
-        child: ListView(
-          children: [
-            _buildBanner(),
-            const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
-            _buildSectionTitle('Khám phá danh mục'),
-            _buildCategoryGrid(),
-            const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
-            _buildSectionTitle('Tin đăng mới'),
-            _buildRecentProductsGrid(),
-          ],
-        ),
-      ),
+    // THAY ĐỔI 1: Bọc Scaffold bằng StreamBuilder để lắng nghe trạng thái đăng nhập
+    return StreamBuilder<User?>(
+      stream: FirebaseAuth.instance.authStateChanges(),
+      builder: (context, snapshot) {
+        // Lấy thông tin người dùng từ snapshot của stream
+        final currentUser = snapshot.data;
+
+        return Scaffold(
+          // THAY ĐỔI 2: Truyền currentUser xuống AppBar
+          appBar: _buildAppBar(currentUser),
+          body: Container(
+            color: AppColors.white,
+            child: ListView(
+              children: [
+                _buildBanner(),
+                const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
+                _buildSectionTitle('Khám phá danh mục'),
+                _buildCategoryGrid(),
+                const Divider(height: 8, thickness: 8, color: AppColors.greyLight),
+                _buildSectionTitle('Tin đăng mới'),
+                _buildRecentProductsGrid(),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
-  AppBar _buildAppBar() {
-    final currentUser = FirebaseAuth.instance.currentUser;
+// THAY ĐỔI 3: Sửa _buildAppBar để nhận currentUser làm tham số
+  AppBar _buildAppBar(User? currentUser) {
+    // Bỏ dòng này đi vì đã nhận currentUser từ bên ngoài
+    // final currentUser = FirebaseAuth.instance.currentUser;
 
     return AppBar(
       backgroundColor: AppColors.white,
@@ -117,7 +122,9 @@ class _HomeScreenState extends State<HomeScreen> {
       actions: [
         // 🛒 Badge giỏ hàng
         StreamBuilder<QuerySnapshot>(
-          stream: _databaseService.getCartItems(),
+          key: ValueKey(currentUser?.uid),
+          // Giờ đây bạn có thể chắc chắn stream này sẽ được khởi tạo lại khi currentUser thay đổi
+          stream: _databaseService.getCartItems(), // Giả sử hàm getCartItems của bạn nhận userId
           builder: (context, snapshot) {
             int cartCount = 0;
             if (snapshot.hasData) {
@@ -148,17 +155,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
         // 💬 Badge tin nhắn chưa đọc
         StreamBuilder<QuerySnapshot>(
-          stream: FirebaseFirestore.instance
+          // Luôn kiểm tra currentUser?.uid có null không trước khi query
+          stream: currentUser != null ? FirebaseFirestore.instance
               .collection('chat_rooms')
-              .where('users', arrayContains: currentUser?.uid)
-              .snapshots(),
+              .where('users', arrayContains: currentUser.uid)
+              .snapshots() : null, // Nếu user null thì không lắng nghe stream nào cả
           builder: (context, snapshot) {
             int unreadCount = 0;
             if (snapshot.hasData) {
               for (var doc in snapshot.data!.docs) {
                 final data = doc.data() as Map<String, dynamic>;
-                if (data['unread'] != null) {
-                  unreadCount += (data['unread'][currentUser?.uid] ?? 0) as int;
+                if (data['unread'] != null && currentUser != null) {
+                  unreadCount += (data['unread'][currentUser.uid] ?? 0) as int;
                 }
               }
             }
@@ -188,16 +196,21 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  /// Widget xây dựng khu vực banner theo mô hình mới
   Widget _buildBanner() {
     return StreamBuilder<DocumentSnapshot>(
       stream: _bannerStream,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(height: 150, child: Center(child: CircularProgressIndicator()));
+          return const SizedBox(
+            height: 200, // cao hơn xíu
+            child: Center(child: CircularProgressIndicator()),
+          );
         }
         if (snapshot.hasError || !snapshot.hasData || !snapshot.data!.exists) {
-          return const SizedBox(height: 150, child: Center(child: Text("Không có banner")));
+          return const SizedBox(
+            height: 200,
+            child: Center(child: Text("Không có banner")),
+          );
         }
 
         final data = snapshot.data!.data() as Map<String, dynamic>;
@@ -213,68 +226,114 @@ class _HomeScreenState extends State<HomeScreen> {
             .toList();
 
         if (imageUrls.isEmpty) {
-          return const SizedBox(height: 150, child: Center(child: Text("Không có banner")));
+          return const SizedBox(
+            height: 200,
+            child: Center(child: Text("Không có banner")),
+          );
         }
+
+        // Tính chiều cao “to hơn xíu” theo tỉ lệ 16:9, clamp để cân đối trên mọi máy
+        final w = MediaQuery.of(context).size.width;
+        final h = 180.0; // min 200, max 320
 
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setState) {
-            return Column(
-              children: [
-                CarouselSlider.builder(
-                  itemCount: imageUrls.length,
-                  itemBuilder: (context, index, realIndex) {
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(8),
-                        child: Image.network(
-                          imageUrls[index],
-                          fit: BoxFit.cover,
-                          width: double.infinity,
-                          loadingBuilder: (context, child, loadingProgress) {
-                            if (loadingProgress == null) return child;
-                            return const Center(child: CircularProgressIndicator());
-                          },
-                          errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.error)),
+            return SizedBox(
+              width: double.infinity,
+              height: h,
+              // full 2 bên: không padding ngang
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Slider full-bleed
+                  CarouselSlider.builder(
+                    itemCount: imageUrls.length,
+                    itemBuilder: (context, index, realIndex) {
+                      final url = imageUrls[index];
+                      return ClipRRect(
+                        // bo nhẹ cho đẹp; nếu muốn thật sự "vuông" sát mép, đổi về Radius.zero
+                        borderRadius: BorderRadius.zero,
+                        child: Stack(
+                          fit: StackFit.expand,
+                          children: [
+                            // Ảnh
+                            Image.network(
+                              url,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loading) {
+                                if (loading == null) return child;
+                                return const Center(child: CircularProgressIndicator());
+                              },
+                              errorBuilder: (_, __, ___) => const Center(child: Icon(Icons.error)),
+                            ),
+                            // Gradient dưới để dot/ chữ rõ hơn
+                            Positioned.fill(
+                              child: IgnorePointer(
+                                ignoring: true,
+                                child: DecoratedBox(
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      begin: Alignment.bottomCenter,
+                                      end: Alignment.topCenter,
+                                      colors: [
+                                        Colors.black.withOpacity(0.25),
+                                        Colors.transparent,
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                      ),
-                    );
-                  },
-                  options: CarouselOptions(
-                    height: 150,
-                    autoPlay: true,
-                    viewportFraction: 1.0,
-                    onPageChanged: (index, reason) {
-                      setState(() {
-                        _currentBannerIndex = index;
-                      });
+                      );
                     },
+                    options: CarouselOptions(
+                      height: h,
+                      viewportFraction: 1.0,
+                      enableInfiniteScroll: true,
+                      autoPlay: true,
+                      autoPlayInterval: const Duration(seconds: 4),
+                      autoPlayAnimationDuration: const Duration(milliseconds: 650),
+                      onPageChanged: (index, reason) {
+                        setState(() => _currentBannerIndex = index);
+                      },
+                    ),
                   ),
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: List.generate(imageUrls.length, (index) {
-                    return AnimatedContainer(
-                      duration: const Duration(milliseconds: 300),
-                      margin: const EdgeInsets.symmetric(horizontal: 4),
-                      height: 8,
-                      width: _currentBannerIndex == index ? 24 : 8,
-                      decoration: BoxDecoration(
-                        color: _currentBannerIndex == index ? AppColors.primaryRed : AppColors.grey,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    );
-                  }),
-                ),
-              ],
+
+                  // Dots overlay giữa đáy (đẹp, cân đối)
+                  Positioned(
+                    left: 0,
+                    right: 0,
+                    bottom: 12,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: List.generate(imageUrls.length, (index) {
+                        final isActive = _currentBannerIndex == index;
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.symmetric(horizontal: 4),
+                          height: 8,
+                          width: isActive ? 28 : 8,
+                          decoration: BoxDecoration(
+                            color: isActive ? AppColors.primaryRed : Colors.white.withOpacity(0.55),
+                            borderRadius: BorderRadius.circular(12),
+                            boxShadow: isActive
+                                ? [BoxShadow(color: Colors.black.withOpacity(0.25), blurRadius: 6, offset: const Offset(0, 2))]
+                                : null,
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );
       },
     );
   }
-
 
   Widget _buildSectionTitle(String title) {
     return Padding(

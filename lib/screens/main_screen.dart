@@ -46,7 +46,7 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       // Giữ thuộc tính này, nó vẫn hữu ích
-      resizeToAvoidBottomInset: true,
+      resizeToAvoidBottomInset: false,
       // Bỏ floatingActionButton và floatingActionButtonLocation
       // Thay vào đó, body sẽ là một Stack
       body: Stack(

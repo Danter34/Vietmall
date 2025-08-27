@@ -4,6 +4,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/screens/main_screen.dart';
 import 'firebase_options.dart';
+import 'package:vietmall/screens/auth/auth_wrapper.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -53,7 +54,7 @@ class VietMallApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: AuthWrapper(),
     );
   }
 }

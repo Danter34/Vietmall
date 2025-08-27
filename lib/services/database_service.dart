@@ -280,6 +280,13 @@ class DatabaseService {
       await doc.reference.delete();
     }
   }
+  //Banner
+  Stream<QuerySnapshot<Map<String, dynamic>>> streamBanners() {
+    return _firestore
+        .collection('banners')
+        .orderBy('createdAt', descending: true)
+        .snapshots();
+  }
   // --- Chức năng Yêu thích ---
   Stream<bool> isFavorite(String productId) {
     final currentUser = _auth.currentUser;
@@ -382,20 +389,34 @@ class DatabaseService {
   }
   // --- Chức năng Hồ sơ Công khai & Theo dõi ---
   Future<void> updateUserProfile({
+    // Các tham số cũ
     required String fullName,
     required DateTime birthDate,
-    required String address,
+    required String address, // Giữ lại để lưu địa chỉ đầy đủ
     required String avatarUrl,
     required String coverUrl,
+
+    // Các tham số mới cho địa chỉ chi tiết
+    required String province,
+    required String district,
+    required String ward,
+    required String street,
   }) async {
     final currentUser = _auth.currentUser;
     if (currentUser == null) return;
 
+    // Cập nhật tên hiển thị trong Authentication
     await currentUser.updateDisplayName(fullName);
+
+    // Cập nhật tất cả các trường trong document Firestore
     await _firestore.collection('users').doc(currentUser.uid).update({
       'fullName': fullName,
       'birthDate': Timestamp.fromDate(birthDate),
-      'address': address,
+      'address': address, // Địa chỉ đầy đủ
+      'province': province, // Tỉnh/Thành
+      'district': district, // Quận/Huyện
+      'ward': ward,         // Phường/Xã
+      'street': street,     // Đường/Số nhà
       'avatarUrl': avatarUrl,
       'coverUrl': coverUrl,
     });
