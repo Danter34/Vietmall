@@ -27,7 +27,11 @@ class _AccountInfoScreenState extends State<AccountInfoScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Thông tin tài khoản"),
+        title: const Text(
+          'Thông tin tài khoản',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
         actions: [
           TextButton(
             onPressed: () {

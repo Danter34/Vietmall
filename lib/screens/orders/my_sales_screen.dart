@@ -27,9 +27,15 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Đơn bán"),
+        title: const Text(
+          'Đơn bán',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
         bottom: TabBar(
           controller: _tabController,
+          unselectedLabelColor: Colors.white,
+          indicatorColor: Colors.blueAccent,
           tabs: const [
             Tab(text: "Hoạt động"),
             Tab(text: "Lịch sử"),
@@ -39,7 +45,7 @@ class _MySalesScreenState extends State<MySalesScreen> with SingleTickerProvider
       body: TabBarView(
         controller: _tabController,
         children: const [
-          SalesOrderListView(statuses: ['Đang xử lý', 'Đang giao hàng']),
+          SalesOrderListView(statuses: ['Đang xử lý', 'Đang vận chuyển','Đang giao hàng']),
           SalesOrderListView(statuses: ['Đã giao', 'Đã hủy']),
         ],
       ),

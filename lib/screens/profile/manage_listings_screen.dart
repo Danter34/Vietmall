@@ -18,7 +18,11 @@ class _ManageListingsScreenState extends State<ManageListingsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Quản lý tin đăng"),
+        title: const Text(
+          'Quản lý tin đăng',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _databaseService.getMyProducts(),

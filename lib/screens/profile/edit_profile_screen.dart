@@ -190,7 +190,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Chỉnh sửa thông tin"),
+        title: const Text(
+          'Chỉnh sửa thông tin',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
         actions: [
           if (_isLoading)
             const SizedBox.shrink()

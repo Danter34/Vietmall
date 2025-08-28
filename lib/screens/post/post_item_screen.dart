@@ -120,7 +120,7 @@ class _PostItemScreenState extends State<PostItemScreen> {
         setState(() => _isLoading = false);
         if (result == null) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text("Đăng tin thành công!")),
+            const SnackBar(content: Text("Đăng tin thành công Đang chờ để xét duyệt!")),
           );
           Navigator.of(context).pop();
         } else {
@@ -141,7 +141,11 @@ class _PostItemScreenState extends State<PostItemScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tạo tin đăng mới"),
+        title: const Text(
+          'Tạo tin đăng mới',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
         centerTitle: true,
       ),
       body: Form(

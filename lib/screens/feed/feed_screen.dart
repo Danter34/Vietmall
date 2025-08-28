@@ -17,7 +17,11 @@ class _FeedScreenState extends State<FeedScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Dạo VietMall"),
+        title: const Text(
+          'Dạo VietMall',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _databaseService.getFeedPosts(),

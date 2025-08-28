@@ -22,7 +22,11 @@ class _CartScreenState extends State<CartScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Giỏ hàng"),
+        title: const Text(
+          'Giỏ hàng',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
         actions: [
           if (_selectedItems.isNotEmpty)
             TextButton(

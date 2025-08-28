@@ -8,6 +8,61 @@ class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // ==== THÊM HÀM THÔNG BÁO MỚI ====
+  Future<void> createNotification({
+    required String userId,
+    required String title,
+    required String body,
+    required String type,
+    Map<String, dynamic>? data,
+  }) async {
+    await _firestore.collection('notifications').add({
+      'userId': userId,
+      'title': title,
+      'body': body,
+      'read': false,
+      'createdAt': FieldValue.serverTimestamp(),
+      'type': type,
+      'data': data ?? {},
+    });
+  }
+
+  // Stream đếm số thông báo chưa đọc
+  Stream<int> getUnreadNotificationCount() {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return Stream.value(0);
+
+    return _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: currentUser.uid)
+        .where('read', isEqualTo: false)
+        .snapshots()
+        .map((snapshot) => snapshot.size);
+  }
+
+  // Đánh dấu tất cả thông báo chưa đọc là đã đọc
+  Future<void> markAllAsRead() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    final unreadDocs = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: currentUser.uid)
+        .where('read', isEqualTo: false)
+        .get();
+
+    for (var doc in unreadDocs.docs) {
+      // Sử dụng try-catch để cập nhật từng tài liệu
+      try {
+        await doc.reference.update({'read': true});
+      } catch (e) {
+        // In lỗi ra để kiểm tra
+        print('Lỗi khi cập nhật tài liệu ${doc.id}: $e');
+      }
+    }
+  }
+  // ==== KẾT THÚC THÊM HÀM THÔNG BÁO MỚI ====
+
   // Lấy danh mục (real-time)
   Stream<QuerySnapshot> getCategories() {
     return _firestore.collection('categories').orderBy('name').snapshots();
@@ -194,6 +249,45 @@ class DatabaseService {
 
     final cartItemIds = items.map((item) => item['productId'] as String).toList();
     await removeCartItems(cartItemIds);
+
+    // ==== THÊM LOGIC TẠO THÔNG BÁO CHO ĐƠN HÀNG MỚI ====
+    // Tạo thông báo cho người mua
+    await createNotification(
+      userId: currentUser.uid,
+      title: '🛒 Đơn hàng đã đặt thành công!',
+      body: 'Đơn hàng của bạn đã được ghi nhận. Chúng tôi sẽ xử lý sớm.',
+      type: 'order',
+      data: {'orderId': orderRef.id},
+    );
+
+    // Tạo thông báo cho từng người bán
+    final Map<String, List<String>> sellerProductMap = {};
+    for (var item in items) {
+      final sellerId = item['sellerId'] as String;
+      if (!sellerProductMap.containsKey(sellerId)) {
+        sellerProductMap[sellerId] = [];
+      }
+      sellerProductMap[sellerId]!.add(item['title'] as String);
+    }
+
+    for (var sellerId in sellerProductMap.keys) {
+      await createNotification(
+        userId: sellerId,
+        title: '🔔 Có đơn hàng mới!',
+        body: 'Bạn có một đơn hàng mới từ khách hàng.',
+        type: 'order',
+        data: {'orderId': orderRef.id},
+      );
+    }
+    const adminId = 'O83stqwhkOee5NebIGjqFlRCoAh1';
+
+    await createNotification(
+      userId: adminId,
+      title: '📦 Đơn hàng mới!',
+      body: 'Một đơn hàng mới #${orderRef.id} đã được đặt.',
+      type: 'admin_action',
+      data: {'orderId': orderRef.id, 'userId': currentUser.uid},
+    );
   }
   // Lấy danh sách đơn bán của bạn
   Stream<QuerySnapshot> getSalesOrders(List<String> statuses) {
@@ -228,10 +322,36 @@ class DatabaseService {
 
   // Hủy đơn hàng
   Future<void> cancelOrder(String orderId) async {
+    final orderDoc = await _firestore.collection('orders').doc(orderId).get();
+    final orderData = orderDoc.data() as Map<String, dynamic>;
+    final userId = orderData['userId'] as String;
+    final sellerIds = List<String>.from(orderData['sellerIds']);
+
     await _firestore
         .collection('orders')
         .doc(orderId)
         .update({'status': 'Đã hủy'});
+
+    // ==== THÊM LOGIC TẠO THÔNG BÁO CHO ĐƠN HÀNG BỊ HỦY ====
+    // Tạo thông báo cho người mua (người hủy)
+    await createNotification(
+      userId: userId,
+      title: '💔 Đơn hàng đã hủy thành công!',
+      body: 'Đơn hàng #${orderId} của bạn đã được hủy.',
+      type: 'order',
+      data: {'orderId': orderId},
+    );
+
+    // Tạo thông báo cho người bán
+    for (var sellerId in sellerIds) {
+      await createNotification(
+        userId: sellerId,
+        title: '💔 Đơn hàng đã bị hủy!',
+        body: 'Khách hàng đã hủy đơn hàng #${orderId} của bạn.',
+        type: 'order',
+        data: {'orderId': orderId},
+      );
+    }
   }
 
   // Lấy danh sách sản phẩm của người dùng hiện tại
@@ -338,6 +458,17 @@ class DatabaseService {
         'savedAt': Timestamp.now(),
         'isHidden': false, // mặc định chưa ẩn
       });
+    }
+
+    // ==== THÊM LOGIC TẠO THÔNG BÁO KHI LƯU TIN ====
+    if (!doc.exists) {
+      await createNotification(
+        userId: currentUser.uid,
+        title: '⭐️ Đã lưu tin thành công!',
+        body: 'Tin đăng "${product.title}" đã được lưu vào danh sách yêu thích của bạn.',
+        type: 'favorite',
+        data: {'productId': product.id},
+      );
     }
   }
 
@@ -554,10 +685,19 @@ class DatabaseService {
       batch.delete(doc.reference);
     }
 
+    // 8️⃣ Xóa notifications của user
+    final notificationsSnapshot = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .get();
+    for (var doc in notificationsSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
     // Commit batch
     await batch.commit();
 
-    // 8️⃣ Xóa user trên Authentication
+    // 9️⃣ Xóa user trên Authentication
     final currentUser = _auth.currentUser;
     if (currentUser != null && currentUser.uid == userId) {
       await currentUser.delete();
@@ -598,7 +738,7 @@ class DatabaseService {
         'categoryId': categoryId,
         'categoryName': categoryName,
         'createdAt': Timestamp.now(),
-        'isHidden': false, //thêm mặc định
+        'isHidden': false,
         'status': 'pending',
       });
 
@@ -612,13 +752,27 @@ class DatabaseService {
           'sellerId': sellerId,
           'sellerName': sellerName,
           'createdAt': Timestamp.now(),
-          'isHidden': false, //thêm mặc định
+          'isHidden': false,
           'status': 'pending',
         });
       }
 
+
+      const adminId = 'O83stqwhkOee5NebIGjqFlRCoAh1'; // Replace with the actual Admin's UID
+
+      await createNotification(
+        userId: adminId,
+        title: '📝 Có Đơn hàng mới cần được duyệt',
+        body: 'A new post titled "${title}" has been submitted and is pending review.',
+        type: 'admin_action',
+        data: {'productId': newProductRef.id},
+      );
+
+
       return null;
     } catch (e) {
+      // It's good practice to log the error to the console
+      print('Error creating product: $e');
       return e.toString();
     }
   }

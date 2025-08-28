@@ -25,6 +25,7 @@ dependencies:
   url_launcher: ^6.3.2
   firebase_messaging: ^14.7.10
   flutter_local_notifications: ^17.2.3
+  badges: ^3.1.2
 
 dev_dependencies:
   flutter_test:
@@ -44,3 +45,4 @@ flutter:
     - assets/main/
     - assets/icon/
     - assets/json/
+    - assets/img/

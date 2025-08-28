@@ -35,7 +35,11 @@ class SettingsScreen extends StatelessWidget {
   Widget _buildScaffold(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Cài đặt"),
+        title: const Text(
+          'Cài đặt',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: ListView(
         children: [

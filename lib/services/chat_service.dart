@@ -5,6 +5,13 @@ class ChatService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  Stream<QuerySnapshot> getChatRoomsByAdmin(String adminId) {
+    return _firestore
+        .collection('chat_rooms')
+        .where('users', arrayContains: adminId)
+        .orderBy('lastMessageTimestamp', descending: true)
+        .snapshots();
+  }
   // Lấy stream các cuộc trò chuyện của người dùng hiện tại
   Stream<QuerySnapshot> getChatRooms() {
     final currentUser = _auth.currentUser;

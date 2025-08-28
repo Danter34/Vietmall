@@ -6,6 +6,9 @@ import 'package:vietmall/screens/profile/profile_screen.dart';
 import 'package:vietmall/widgets/auth_required_dialog.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:vietmall/screens/feed/feed_screen.dart';
+import 'package:vietmall/nofication/notification_screen.dart'; // Import the notification screen
+import 'package:badges/badges.dart' as badges; // Import the badges library
+import 'package:vietmall/services/database_service.dart'; // Import your DatabaseService
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -16,18 +19,20 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int _selectedIndex = 0;
+  final DatabaseService _dbService = DatabaseService(); // Add an instance of your service
 
+  // Keep the list as is, it's just a placeholder for the notification tab
   static final List<Widget> _widgetOptions = <Widget>[
     const HomeScreen(),
     const FeedScreen(),
-    const Center(child: Text('Thông báo')),
+    const NotificationScreen(),
     const ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+      setState(() {
+        _selectedIndex = index;
+      });
   }
 
   void _navigateToPostScreen() {
@@ -45,10 +50,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      // Giữ thuộc tính này, nó vẫn hữu ích
       resizeToAvoidBottomInset: false,
-      // Bỏ floatingActionButton và floatingActionButtonLocation
-      // Thay vào đó, body sẽ là một Stack
       body: Stack(
         children: [
           Padding(
@@ -71,14 +73,11 @@ class _MainScreenState extends State<MainScreen> {
     );
   }
 
-  // Widget mới để chứa cả BottomAppBar và nút FAB
   Widget _buildBottomNavWithFab() {
     return Stack(
-      // Cho phép nút FAB vẽ ra ngoài phạm vi của BottomAppBar
       clipBehavior: Clip.none,
       alignment: Alignment.center,
       children: [
-        // Lớp nền: BottomAppBar của bạn
         BottomAppBar(
           shape: const CircularNotchedRectangle(),
           notchMargin: 8.0,
@@ -88,13 +87,12 @@ class _MainScreenState extends State<MainScreen> {
             children: <Widget>[
               _buildNavItem("assets/main/home.png", "Trang chủ", 0),
               _buildNavItem("assets/main/daoviet.png", "Dạo VietMall", 1),
-              const SizedBox(width: 40), // chừa chỗ cho nút đăng tin
+              const SizedBox(width: 40),
               _buildNavItem("assets/main/Group.png", "Thông báo", 2),
               _buildNavItem("assets/main/user.png", "Tài khoản", 3),
             ],
           ),
         ),
-        // Lớp trên: Nút Đăng tin (giữ nguyên Transform của bạn)
         Transform(
           transform: Matrix4.translationValues(5, -15, 0),
           child: GestureDetector(
@@ -124,6 +122,57 @@ class _MainScreenState extends State<MainScreen> {
 
   Widget _buildNavItem(String assetPath, String label, int index) {
     final isSelected = _selectedIndex == index;
+
+    if (index == 2) { // Logic for the "Thông báo" tab
+      return InkWell(
+        onTap: () => _onItemTapped(index),
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 6.0, horizontal: 8.0),
+          child: StreamBuilder<int>(
+            stream: _dbService.getUnreadNotificationCount(),
+            builder: (context, snapshot) {
+              final unreadCount = snapshot.data ?? 0;
+              return badges.Badge(
+                showBadge: unreadCount > 0,
+                position: badges.BadgePosition.topEnd(top: 0, end: 10),
+                badgeContent: const SizedBox(
+                  width: 2,
+                  height: 2,
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      assetPath,
+                      width: 24,
+                      height: 24,
+                      color: isSelected ? AppColors.primaryRed : AppColors.greyDark,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      label,
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: isSelected ? AppColors.primaryRed : AppColors.greyDark,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      );
+    }
+
+    // Logic for other tabs
     return InkWell(
       onTap: () => _onItemTapped(index),
       borderRadius: BorderRadius.circular(20),

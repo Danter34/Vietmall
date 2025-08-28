@@ -51,7 +51,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(appBarTitle),
+        title: Text(appBarTitle, style: TextStyle(color: Colors.white),
+        ),
+          backgroundColor: const Color(0xFFE53935),
         actions: [
           PopupMenuButton<PriceSortOption>(
             icon: const Icon(Icons.sort),

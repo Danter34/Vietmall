@@ -40,7 +40,11 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Thanh toán"),
+        title: const Text(
+          'Thanh toán',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: ListView(
         children: [

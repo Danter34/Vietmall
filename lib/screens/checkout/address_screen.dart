@@ -81,7 +81,11 @@ class _AddressScreenState extends State<AddressScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Địa chỉ giao hàng"),
+        title: const Text(
+          'Địa chỉ giao hàng',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())

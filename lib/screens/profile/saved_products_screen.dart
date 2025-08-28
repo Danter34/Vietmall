@@ -18,7 +18,11 @@ class _SavedProductsScreenState extends State<SavedProductsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tin đăng đã lưu"),
+        title: const Text(
+          'Tin đã lưu',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: _databaseService.getFavoriteProducts(),

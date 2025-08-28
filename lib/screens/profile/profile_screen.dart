@@ -11,7 +11,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:vietmall/screens/profile/settings_screen.dart';
 import 'package:vietmall/screens/orders/my_sales_screen.dart';
 import 'package:vietmall/screens/profile/public_profile_screen.dart';
-
+import 'package:vietmall/screens/contact_support_screen.dart';
+import 'package:vietmall/screens/about_app_screen.dart';
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
@@ -19,7 +20,11 @@ class ProfileScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tài khoản"),
+        title: const Text(
+          'Tài Khoản',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
       ),
       body: StreamBuilder<User?>(
         stream: AuthService().authStateChanges,
@@ -118,8 +123,32 @@ class ProfileScreen extends StatelessWidget {
                   }
                 },
               ),
-              _buildOptionTile(Icons.help_outline, "Trợ giúp"),
-              _buildOptionTile(Icons.feedback_outlined, "Đóng góp ý kiến"),
+              _buildOptionTile(
+                Icons.support_agent_outlined,
+                "Liên hệ CSKH",
+                onTap: () {
+                  if (isLoggedIn) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const ContactSupportScreen(),
+                      ),
+                    );
+                  } else {
+                    showAuthRequiredDialog(context);
+                  }
+                },
+              ),
+              _buildOptionTile(
+                Icons.info_outline,
+                "Về Chúng Tôi",
+                onTap: () {
+                  Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                          builder: (context) => const AboutAppScreen()));
+                },
+              ),
 
               if (isLoggedIn)
                 Padding(

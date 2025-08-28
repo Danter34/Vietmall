@@ -21,7 +21,11 @@ class _ChatListScreenState extends State<ChatListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Tin nhắn"),
+        title: const Text(
+          'Tin nhắn',
+          style: TextStyle(color: Colors.white),
+        ),
+        backgroundColor: const Color(0xFFE53935),
         elevation: 1,
       ),
       body: Column(

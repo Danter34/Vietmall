@@ -96,7 +96,26 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
         final docs = snapshot.data?.docs ?? [];
         if (docs.isEmpty) {
-          return const Center(child: Text("Hãy gửi tin nhắn đầu tiên của bạn! 😉"));
+          // ✅ PHẦN NÀY ĐÃ ĐƯỢC SỬA ĐỔI
+          // Kiểm tra nếu người dùng đang chat với CSKH
+          if (widget.receiverName == 'Bộ phận Hỗ trợ') {
+            return const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16.0),
+                child: Text(
+                  "Chào mừng bạn đến với bộ phận hỗ trợ khách hàng, chúng tôi có thể giúp gì cho bạn?",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: AppColors.greyDark,
+                  ),
+                ),
+              ),
+            );
+          } else {
+            // Màn hình tin nhắn trống cho các cuộc trò chuyện thông thường
+            return const Center(child: Text("Hãy gửi tin nhắn đầu tiên của bạn! 😉"));
+          }
         }
 
         // Khi có dữ liệu, xây dựng ListView
@@ -105,7 +124,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           padding: const EdgeInsets.all(8.0),
           children: snapshot.data!.docs.map((doc) => _buildMessageItem(doc)).toList(),
         );
-      },
+      }
     );
   }
 
