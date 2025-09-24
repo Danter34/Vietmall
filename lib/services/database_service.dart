@@ -8,6 +8,29 @@ class DatabaseService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
+  // Lưu địa chỉ giao hàng
+  Future<void> saveShippingAddress(Map<String, String> address) async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return;
+
+    await _firestore.collection('users').doc(currentUser.uid).update({
+      'shippingAddress': address,
+    });
+  }
+
+  // Lấy địa chỉ giao hàng đã lưu
+  Future<Map<String, String>?> getShippingAddress() async {
+    final currentUser = _auth.currentUser;
+    if (currentUser == null) return null;
+
+    final doc =
+    await _firestore.collection('users').doc(currentUser.uid).get();
+    final data = doc.data();
+    if (data != null && data['shippingAddress'] != null) {
+      return Map<String, String>.from(data['shippingAddress']);
+    }
+    return null;
+  }
   // ==== THÊM HÀM THÔNG BÁO MỚI ====
   Future<void> createNotification({
     required String userId,
@@ -117,16 +140,13 @@ class DatabaseService {
     String? searchQuery,
     PriceSortOption sortOption = PriceSortOption.none,
   }) {
-    Query query = _firestore.collection('products').where('status', isEqualTo: 'approved').where('isHidden', isEqualTo: false);
+    Query query = _firestore
+        .collection('products')
+        .where('status', isEqualTo: 'approved')
+        .where('isHidden', isEqualTo: false);
 
     if (categoryId != null) {
       query = query.where('categoryId', isEqualTo: categoryId);
-    }
-    if (searchQuery != null) {
-      query = query
-          .where('title', isGreaterThanOrEqualTo: searchQuery)
-          .where('title', isLessThanOrEqualTo: searchQuery + '\uf8ff')
-          .orderBy('title');
     }
 
     switch (sortOption) {
@@ -141,9 +161,9 @@ class DatabaseService {
         query = query.orderBy('createdAt', descending: true);
         break;
     }
-
     return query.snapshots();
   }
+
 
   // Hàm mới để ẩn/hiện tin
   Future<void> toggleProductVisibility(String productId,
@@ -520,37 +540,51 @@ class DatabaseService {
   }
   // --- Chức năng Hồ sơ Công khai & Theo dõi ---
   Future<void> updateUserProfile({
-    // Các tham số cũ
     required String fullName,
     required DateTime birthDate,
-    required String address, // Giữ lại để lưu địa chỉ đầy đủ
-    required String avatarUrl,
-    required String coverUrl,
-
-    // Các tham số mới cho địa chỉ chi tiết
+    required String address,
     required String province,
     required String district,
     required String ward,
     required String street,
+    String? avatarUrl,
+    String? coverUrl,
   }) async {
-    final currentUser = _auth.currentUser;
-    if (currentUser == null) return;
+    final user = _auth.currentUser;
+    if (user == null) return;
 
-    // Cập nhật tên hiển thị trong Authentication
-    await currentUser.updateDisplayName(fullName);
-
-    // Cập nhật tất cả các trường trong document Firestore
-    await _firestore.collection('users').doc(currentUser.uid).update({
+    // update profile cơ bản
+    await _firestore.collection('users').doc(user.uid).update({
       'fullName': fullName,
       'birthDate': Timestamp.fromDate(birthDate),
-      'address': address, // Địa chỉ đầy đủ
-      'province': province, // Tỉnh/Thành
-      'district': district, // Quận/Huyện
-      'ward': ward,         // Phường/Xã
-      'street': street,     // Đường/Số nhà
+      'address': address,
+      'province': province,
+      'district': district,
+      'ward': ward,
+      'street': street,
       'avatarUrl': avatarUrl,
       'coverUrl': coverUrl,
     });
+
+    await user.updateDisplayName(fullName);
+
+    // --- Đồng bộ sang products ---
+    final products = await _firestore
+        .collection('products')
+        .where('sellerId', isEqualTo: user.uid)
+        .get();
+    for (var doc in products.docs) {
+      await doc.reference.update({'sellerName': fullName});
+    }
+
+    // --- Đồng bộ sang feed_posts ---
+    final posts = await _firestore
+        .collection('feed_posts')
+        .where('userId', isEqualTo: user.uid)
+        .get();
+    for (var doc in posts.docs) {
+      await doc.reference.update({'userName': fullName});
+    }
   }
   // Lấy thông tin chi tiết của một người dùng
   Stream<DocumentSnapshot> getUserProfile(String userId) {

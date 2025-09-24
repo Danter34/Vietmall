@@ -26,7 +26,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
 
 
-  // ----- BẮT ĐẦU FIX LỖI CHỚP-LOAD LẠI -----
 
   // 1. Khai báo biến để lưu các stream
   late Stream<QuerySnapshot> _categoryStream;
@@ -46,7 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
         .snapshots();
   }
 
-  // ----- KẾT THÚC FIX LỖI CHỚP-LOAD LẠI -----
 
   @override
   void dispose() {
@@ -112,7 +110,8 @@ class _HomeScreenState extends State<HomeScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (context) => ProductListScreen(searchQuery: value.trim()),
+                  builder: (context) =>
+                      ProductListScreen(searchQuery: value.trim()),
                 ),
               );
             }
@@ -120,7 +119,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       actions: [
-        // 🛒 Badge giỏ hàng
+        //  Badge giỏ hàng
         StreamBuilder<QuerySnapshot>(
           key: ValueKey(currentUser?.uid),
           // Giờ đây bạn có thể chắc chắn stream này sẽ được khởi tạo lại khi currentUser thay đổi

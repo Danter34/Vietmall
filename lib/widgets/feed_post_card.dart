@@ -71,59 +71,71 @@ class FeedPostCard extends StatelessWidget {
     final databaseService = DatabaseService();
     final currentUser = AuthService().currentUser;
     final sellerId = postData['sellerId'];
+    final oldSellerName = postData['sellerName'] ?? "Người bán";
     final isMyPost = currentUser != null && currentUser.uid == sellerId;
 
     return Padding(
       padding: const EdgeInsets.all(12.0),
       child: Row(
         children: [
-          // Avatar lấy từ Firestore
+          // Avatar + tên từ Firestore
           StreamBuilder<DocumentSnapshot>(
             stream: databaseService.getUserProfile(sellerId),
             builder: (context, snapshot) {
-              if (!snapshot.hasData || !snapshot.data!.exists) {
-                return const CircleAvatar(backgroundColor: AppColors.greyLight);
-              }
-              final data = snapshot.data!.data() as Map<String, dynamic>;
-              final avatarUrl = data['avatarUrl'] as String?;
-              return CircleAvatar(
-                radius: 20,
-                backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                backgroundColor: avatarUrl == null || avatarUrl.isEmpty
-                    ? AppColors.greyLight
-                    : Colors.transparent,
-              );
-            },
-          ),
-          const SizedBox(width: 12),
+              final userData =
+              snapshot.hasData && snapshot.data!.exists
+                  ? snapshot.data!.data() as Map<String, dynamic>
+                  : null;
+              final avatarUrl = userData?['avatarUrl'] as String?;
+              final displayName =
+                  userData?['fullName'] as String? ?? oldSellerName;
 
-          // Tên + thời gian
-          InkWell(
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => PublicProfileScreen(userId: sellerId),
+              return InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) =>
+                          PublicProfileScreen(userId: sellerId),
+                    ),
+                  );
+                },
+                child: Row(
+                  children: [
+                    CircleAvatar(
+                      radius: 20,
+                      backgroundImage: avatarUrl != null && avatarUrl.isNotEmpty
+                          ? NetworkImage(avatarUrl)
+                          : null,
+                      backgroundColor: avatarUrl == null || avatarUrl.isEmpty
+                          ? AppColors.greyLight
+                          : Colors.transparent,
+                      child: (avatarUrl == null || avatarUrl.isEmpty)
+                          ? const Icon(Icons.person, color: Colors.white)
+                          : null,
+                    ),
+                    const SizedBox(width: 12),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(displayName,
+                            style:
+                            const TextStyle(fontWeight: FontWeight.bold)),
+                        Text(
+                          timeAgoFromTimestamp(postData['createdAt']),
+                          style: const TextStyle(
+                              color: Colors.grey, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
               );
             },
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(postData['sellerName'] ?? 'Người bán',
-                    style: const TextStyle(fontWeight: FontWeight.bold)),
-                Text(
-                  timeAgoFromTimestamp(postData['createdAt']),
-                  style: const TextStyle(color: Colors.grey, fontSize: 12),
-                ),
-              ],
-            ),
           ),
           const Spacer(),
 
-          // Nút theo dõi chỉ hiện khi không phải bài của mình
+          // Nút theo dõi
           if (!isMyPost)
             StreamBuilder<bool>(
               stream: databaseService.isFollowing(sellerId),

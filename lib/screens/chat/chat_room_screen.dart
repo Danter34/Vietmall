@@ -4,6 +4,7 @@ import 'package:vietmall/common/app_colors.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/chat_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+
 class ChatRoomScreen extends StatefulWidget {
   final String receiverId;
   final String receiverName;
@@ -22,6 +23,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ChatService _chatService = ChatService();
   final AuthService _authService = AuthService();
   final TextEditingController _messageController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
@@ -53,7 +55,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       );
       _messageController.clear();
     } catch (e) {
-      // Hiện thông báo lỗi cho người dùng
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Gửi tin nhắn thất bại: $e')),
       );
@@ -64,8 +65,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.receiverName),
         centerTitle: true,
+        title: widget.receiverName == "Bộ phận Hỗ trợ"
+            ? const Text(
+          "Bộ phận CSKH",
+          style: TextStyle(fontWeight: FontWeight.bold),
+        )
+            : StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('users')
+              .doc(widget.receiverId)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return Text(widget.receiverName); // fallback
+            }
+
+            final data = snapshot.data!.data() as Map<String, dynamic>?;
+            final fullName = data?['fullName'] ?? widget.receiverName;
+
+            return Text(
+              fullName,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            );
+          },
+        ),
       ),
       body: Column(
         children: [
@@ -84,11 +108,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           return const Center(child: CircularProgressIndicator());
         }
 
-        // Xử lý khi có lỗi hoặc không có dữ liệu
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
         if (snapshot.hasError) {
           final err = snapshot.error.toString();
           return Center(child: Text("Lỗi tải tin nhắn: $err"));
@@ -96,8 +115,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
         final docs = snapshot.data?.docs ?? [];
         if (docs.isEmpty) {
-          // ✅ PHẦN NÀY ĐÃ ĐƯỢC SỬA ĐỔI
-          // Kiểm tra nếu người dùng đang chat với CSKH
           if (widget.receiverName == 'Bộ phận Hỗ trợ') {
             return const Center(
               child: Padding(
@@ -113,18 +130,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ),
             );
           } else {
-            // Màn hình tin nhắn trống cho các cuộc trò chuyện thông thường
-            return const Center(child: Text("Hãy gửi tin nhắn đầu tiên của bạn! 😉"));
+            return const Center(
+              child: Text("Hãy gửi tin nhắn đầu tiên của bạn! 😉"),
+            );
           }
         }
 
-        // Khi có dữ liệu, xây dựng ListView
         return ListView(
           reverse: true,
           padding: const EdgeInsets.all(8.0),
-          children: snapshot.data!.docs.map((doc) => _buildMessageItem(doc)).toList(),
+          children:
+          snapshot.data!.docs.map((doc) => _buildMessageItem(doc)).toList(),
         );
-      }
+      },
     );
   }
 
@@ -134,10 +152,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final currentUser = FirebaseAuth.instance.currentUser;
     final String? currentUserId = currentUser?.uid;
 
-    bool isCurrentUser = (currentUserId != null) && data['senderId'] == currentUserId;
+    bool isCurrentUser =
+        (currentUserId != null) && data['senderId'] == currentUserId;
 
     var alignment = isCurrentUser ? Alignment.centerRight : Alignment.centerLeft;
-    var bubbleColor = isCurrentUser ? AppColors.primaryRed : AppColors.greyLight;
+    var bubbleColor =
+    isCurrentUser ? AppColors.primaryRed : AppColors.greyLight;
     var textColor = isCurrentUser ? Colors.white : Colors.black87;
     final String messageText = (data['message'] ?? '').toString();
 

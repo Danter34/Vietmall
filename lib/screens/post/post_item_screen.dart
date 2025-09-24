@@ -224,8 +224,10 @@ class _PostItemScreenState extends State<PostItemScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const Text("URL Hình ảnh sản phẩm *",
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const Text(
+          "URL Hình ảnh sản phẩm *",
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+        ),
         const SizedBox(height: 8),
         ListView.builder(
           shrinkWrap: true,
@@ -239,13 +241,30 @@ class _PostItemScreenState extends State<PostItemScreen> {
                   Expanded(
                     child: TextFormField(
                       controller: _imageUrlControllers[index],
-                      decoration: InputDecoration(labelText: 'URL hình ảnh ${index + 1}'),
+                      decoration: InputDecoration(
+                        labelText: 'URL hình ảnh ${index + 1}',
+                      ),
                       keyboardType: TextInputType.url,
+                      validator: (value) {
+                        if (value == null || value.trim().isEmpty) {
+                          return 'Vui lòng nhập URL ảnh';
+                        }
+                        final url = value.trim();
+                        final regex = RegExp(
+                          r'^(https?:\/\/.*\.(?:png|jpg|jpeg|gif|webp|bmp|svg))$',
+                          caseSensitive: false,
+                        );
+                        if (!regex.hasMatch(url)) {
+                          return 'URL ảnh không hợp lệ (http/https + .jpg/.png/...)';
+                        }
+                        return null;
+                      },
                     ),
                   ),
                   if (index > 0)
                     IconButton(
-                      icon: const Icon(Icons.remove_circle_outline, color: AppColors.primaryRed),
+                      icon: const Icon(Icons.remove_circle_outline,
+                          color: AppColors.primaryRed),
                       onPressed: () {
                         setState(() {
                           _imageUrlControllers[index].dispose();

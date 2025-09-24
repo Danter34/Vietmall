@@ -59,15 +59,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /// Tải đồng thời dữ liệu tỉnh/thành và dữ liệu người dùng để tối ưu.
   Future<void> _loadInitialData() async {
-    await Future.wait([
-      _loadProvincesData(),
-      _loadUserData(),
-    ]);
+    try {
+      await _loadProvincesData();   // luôn load provinces trước
+      await _loadUserData();        // sau đó mới load user
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -160,8 +164,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final fullAddress = "${_streetController.text}, ${_selectedWard!}, ${_selectedDistrict!}, ${_selectedProvince!}";
 
-      // Gọi service để cập nhật dữ liệu.
-      // Đảm bảo hàm updateUserProfile của bạn nhận đủ các tham số này.
+      // Xác thực tuổi >= 16
+      final now = DateTime.now();
+      final age = now.year - _selectedBirthDate!.year -
+          ((now.month < _selectedBirthDate!.month ||
+              (now.month == _selectedBirthDate!.month && now.day < _selectedBirthDate!.day))
+              ? 1
+              : 0);
+
+      if (age < 16) {
+        setState(() => _isSaving = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Bạn phải đủ 16 tuổi mới được sử dụng.")),
+        );
+        return;
+      }
       await _databaseService.updateUserProfile(
         fullName: _nameController.text,
         birthDate: _selectedBirthDate!,
@@ -199,7 +216,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           if (_isLoading)
             const SizedBox.shrink()
           else if (_isSaving)
-            const Padding(padding: EdgeInsets.all(16.0), child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)))
+            const Padding(
+                padding: EdgeInsets.all(16.0),
+                child: SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2)))
           else
             TextButton(
               onPressed: () {
@@ -226,31 +248,62 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
             const SizedBox(height: 24),
             _buildAddressSection(),
             const SizedBox(height: 16),
-            _buildTextFormField(_avatarUrlController, "URL Ảnh đại diện", isRequired: false),
+            _buildTextFormField(
+              _avatarUrlController,
+              "URL Ảnh đại diện",
+              isRequired: false,
+              isUrl: true,
+            ),
             const SizedBox(height: 16),
-            _buildTextFormField(_coverUrlController, "URL Ảnh bìa", isRequired: false),
+            _buildTextFormField(
+              _coverUrlController,
+              "URL Ảnh bìa",
+              isRequired: false,
+              isUrl: true,
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildTextFormField(TextEditingController controller, String label, {bool isRequired = true}) {
+  /// TextFormField có hỗ trợ validate URL ảnh
+  Widget _buildTextFormField(
+      TextEditingController controller,
+      String label, {
+        bool isRequired = true,
+        bool isUrl = false,
+      }) {
     return TextFormField(
       controller: controller,
       decoration: InputDecoration(labelText: label),
       enabled: _isEditing,
-      validator: isRequired ? (v) => (v == null || v.isEmpty) ? "Vui lòng nhập thông tin" : null : null,
+      validator: (value) {
+        if (isRequired && (value == null || value.isEmpty)) {
+          return "Vui lòng nhập thông tin";
+        }
+        if (isUrl && value != null && value.isNotEmpty) {
+          final urlPattern =
+              r'^(http|https):\/\/[^\s$.?#].[^\s]*\.(jpg|jpeg|png|gif|webp)$';
+          final regex = RegExp(urlPattern, caseSensitive: false);
+          if (!regex.hasMatch(value)) {
+            return "URL không hợp lệ (phải là link ảnh .jpg, .png, .gif, .webp)";
+          }
+        }
+        return null;
+      },
     );
   }
 
   Widget _buildDatePickerFormField() {
     return TextFormField(
       controller: _birthDateController,
-      decoration: const InputDecoration(labelText: "Ngày sinh", suffixIcon: Icon(Icons.calendar_today)),
+      decoration: const InputDecoration(
+          labelText: "Ngày sinh", suffixIcon: Icon(Icons.calendar_today)),
       readOnly: true,
       onTap: _isEditing ? () => _selectDate(context) : null,
-      validator: (v) => (v == null || v.isEmpty) ? "Vui lòng chọn ngày sinh" : null,
+      validator: (v) =>
+      (v == null || v.isEmpty) ? "Vui lòng chọn ngày sinh" : null,
     );
   }
 
@@ -262,19 +315,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           value: _selectedProvince,
           isExpanded: true,
           hint: const Text("Tỉnh/Thành phố"),
-          items: _provinces.map((province) => DropdownMenuItem(value: province, child: Text(province, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: _isEditing ? (newValue) {
+          items: _provinces
+              .map((province) => DropdownMenuItem(
+              value: province,
+              child: Text(province, overflow: TextOverflow.ellipsis)))
+              .toList(),
+          onChanged: _isEditing
+              ? (newValue) {
             setState(() {
               _selectedProvince = newValue;
-              _selectedDistrict = null; _selectedWard = null;
-              _districts = []; _wards = [];
+              _selectedDistrict = null;
+              _selectedWard = null;
+              _districts = [];
+              _wards = [];
               if (newValue != null) {
-                final provinceData = _allProvincesData.firstWhere((p) => p['name'] == newValue);
-                final districtsData = provinceData['districts'] as List<dynamic>;
-                _districts = districtsData.map<String>((d) => d['name'] as String).toList();
+                final provinceData = _allProvincesData
+                    .firstWhere((p) => p['name'] == newValue);
+                final districtsData =
+                provinceData['districts'] as List<dynamic>;
+                _districts = districtsData
+                    .map<String>((d) => d['name'] as String)
+                    .toList();
               }
             });
-          } : null,
+          }
+              : null,
           validator: (v) => v == null ? "Vui lòng chọn" : null,
         ),
         const SizedBox(height: 16),
@@ -282,20 +347,33 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           value: _selectedDistrict,
           isExpanded: true,
           hint: const Text("Quận/Huyện"),
-          items: _districts.map((district) => DropdownMenuItem(value: district, child: Text(district, overflow: TextOverflow.ellipsis))).toList(),
-          onChanged: _isEditing ? (newValue) {
+          items: _districts
+              .map((district) => DropdownMenuItem(
+              value: district,
+              child: Text(district, overflow: TextOverflow.ellipsis)))
+              .toList(),
+          onChanged: _isEditing
+              ? (newValue) {
             setState(() {
               _selectedDistrict = newValue;
-              _selectedWard = null; _wards = [];
+              _selectedWard = null;
+              _wards = [];
               if (newValue != null) {
-                final provinceData = _allProvincesData.firstWhere((p) => p['name'] == _selectedProvince);
-                final districtsData = provinceData['districts'] as List<dynamic>;
-                final districtData = districtsData.firstWhere((d) => d['name'] == newValue);
-                final wardsData = districtData['wards'] as List<dynamic>;
-                _wards = wardsData.map<String>((w) => w['name'] as String).toList();
+                final provinceData = _allProvincesData
+                    .firstWhere((p) => p['name'] == _selectedProvince);
+                final districtsData =
+                provinceData['districts'] as List<dynamic>;
+                final districtData = districtsData
+                    .firstWhere((d) => d['name'] == newValue);
+                final wardsData =
+                districtData['wards'] as List<dynamic>;
+                _wards = wardsData
+                    .map<String>((w) => w['name'] as String)
+                    .toList();
               }
             });
-          } : null,
+          }
+              : null,
           validator: (v) => v == null ? "Vui lòng chọn" : null,
         ),
         const SizedBox(height: 16),
@@ -303,7 +381,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           value: _selectedWard,
           isExpanded: true,
           hint: const Text("Phường/Xã"),
-          items: _wards.map((ward) => DropdownMenuItem(value: ward, child: Text(ward, overflow: TextOverflow.ellipsis))).toList(),
+          items: _wards
+              .map((ward) => DropdownMenuItem(
+              value: ward,
+              child: Text(ward, overflow: TextOverflow.ellipsis)))
+              .toList(),
           onChanged: _isEditing ? (newValue) => setState(() => _selectedWard = newValue) : null,
           validator: (v) => v == null ? "Vui lòng chọn" : null,
         ),
@@ -312,7 +394,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           controller: _streetController,
           decoration: const InputDecoration(labelText: "Số nhà, tên đường"),
           enabled: _isEditing,
-          validator: (v) => (v == null || v.isEmpty) ? "Vui lòng nhập địa chỉ chi tiết" : null,
+          validator: (v) =>
+          (v == null || v.isEmpty) ? "Vui lòng nhập địa chỉ chi tiết" : null,
         ),
       ],
     );

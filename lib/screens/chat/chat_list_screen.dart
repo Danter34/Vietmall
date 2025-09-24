@@ -6,6 +6,7 @@ import 'package:vietmall/screens/chat/chat_room_screen.dart';
 import 'package:vietmall/services/auth_service.dart';
 import 'package:vietmall/services/chat_service.dart';
 import 'package:vietmall/services/database_service.dart';
+
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({super.key});
 
@@ -34,8 +35,9 @@ class _ChatListScreenState extends State<ChatListScreen> {
             child: StreamBuilder<QuerySnapshot>(
               stream: _chatService.getChatRooms(),
               builder: (context, snapshot) {
-                if (snapshot.hasError)
+                if (snapshot.hasError) {
                   return const Center(child: Text("Đã có lỗi xảy ra."));
+                }
                 if (snapshot.connectionState == ConnectionState.waiting) {
                   return const Center(child: CircularProgressIndicator());
                 }
@@ -59,91 +61,98 @@ class _ChatListScreenState extends State<ChatListScreen> {
     );
   }
 
-
   Widget _buildChatListItem(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     final currentUserId = _authService.currentUser!.uid;
 
     List<String> userIds = List<String>.from(data['users']);
     String otherUserId = userIds.firstWhere((id) => id != currentUserId);
-    String otherUserName = data['userNames'][otherUserId] ?? 'Người dùng';
 
-    Timestamp timestamp = data['lastMessageTimestamp'];
-    String formattedTime = DateFormat('HH:mm').format(timestamp.toDate());
+    // Kiểm tra nếu user kia là CSKH thì không render gì
+    return StreamBuilder<DocumentSnapshot>(
+      stream: DatabaseService().getUserProfile(otherUserId),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
 
-    int unreadCount = 0;
-    if (data['unread'] != null) {
-      unreadCount = (data['unread'][currentUserId] ?? 0) as int;
-    }
+        final userData = snapshot.data!.data() as Map<String, dynamic>?;
+        if (userData != null &&
+            (userData['isSupport'] == true || userData['role'] == "admin")) {
+          return const SizedBox.shrink(); // ẩn phòng chat với CSKH
+        }
 
-    return ListTile(
-      tileColor: unreadCount > 0 ? Colors.blue.withOpacity(0.1) : null,
-      leading: StreamBuilder<DocumentSnapshot>(
-        stream: DatabaseService().getUserProfile(otherUserId),
-        builder: (context, snapshot) {
-          if (!snapshot.hasData) {
-            return const CircleAvatar(
-              radius: 28,
-              backgroundColor: AppColors.greyLight,
-            );
-          }
+        String otherUserName = data['userNames'][otherUserId] ?? 'Người dùng';
+        if (userData != null && userData['fullName'] != null) {
+          otherUserName = userData['fullName'];
+        }
 
-          final userData = snapshot.data!.data() as Map<String, dynamic>?;
-          final avatarUrl = userData?['avatarUrl'] as String?;
+        Timestamp timestamp = data['lastMessageTimestamp'];
+        String formattedTime = DateFormat('HH:mm').format(timestamp.toDate());
 
-          return CircleAvatar(
+        int unreadCount = 0;
+        if (data['unread'] != null) {
+          unreadCount = (data['unread'][currentUserId] ?? 0) as int;
+        }
+
+        return ListTile(
+          tileColor: unreadCount > 0 ? Colors.blue.withOpacity(0.1) : null,
+          leading: CircleAvatar(
             radius: 28,
             backgroundColor: AppColors.greyLight,
-            backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                ? NetworkImage(avatarUrl)
+            backgroundImage: (userData?['avatarUrl'] != null &&
+                (userData?['avatarUrl'] as String).isNotEmpty)
+                ? NetworkImage(userData!['avatarUrl'])
                 : null,
-            child: (avatarUrl == null || avatarUrl.isEmpty)
+            child: (userData?['avatarUrl'] == null ||
+                (userData?['avatarUrl'] as String).isEmpty)
                 ? const Icon(Icons.person, color: Colors.white)
                 : null,
-          );
-        },
-      ),
-      title: Row(
-        children: [
-          Text(
-            otherUserName,
+          ),
+          title: Row(
+            children: [
+              Text(
+                otherUserName,
+                style: TextStyle(
+                  fontWeight:
+                  unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                formattedTime,
+                style:
+                const TextStyle(color: AppColors.greyDark, fontSize: 12),
+              ),
+            ],
+          ),
+          subtitle: Text(
+            data['lastMessage'],
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
-              fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
+              fontWeight:
+              unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            formattedTime,
-            style: const TextStyle(color: AppColors.greyDark, fontSize: 12),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        data['lastMessage'],
-        maxLines: 2,
-        overflow: TextOverflow.ellipsis,
-        style: TextStyle(
-          fontWeight: unreadCount > 0 ? FontWeight.bold : FontWeight.normal,
-        ),
-      ),
-      onTap: () async {
-        // khi mở phòng → reset unread
-        await FirebaseFirestore.instance
-            .collection('chat_rooms')
-            .doc(doc.id)
-            .set({
-          'unread': {currentUserId: 0}
-        }, SetOptions(merge: true));
+          onTap: () async {
+            // khi mở phòng → reset unread
+            await FirebaseFirestore.instance
+                .collection('chat_rooms')
+                .doc(doc.id)
+                .set({
+              'unread': {currentUserId: 0}
+            }, SetOptions(merge: true));
 
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (context) =>
-                ChatRoomScreen(
-                  receiverId: otherUserId,
-                  receiverName: otherUserName,
-                ),
-          ),
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) =>
+                    ChatRoomScreen(
+                      receiverId: otherUserId,
+                      receiverName: otherUserName,
+                    ),
+              ),
+            );
+          },
         );
       },
     );

@@ -354,47 +354,48 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     );
   }
 
-  Widget _buildSellerInfo(String sellerId, String sellerName) {
+  Widget _buildSellerInfo(String sellerId, String oldSellerName) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 12.0),
       child: Row(
         children: [
-          // StreamBuilder để lấy avatar của seller
           StreamBuilder<DocumentSnapshot>(
             stream: DatabaseService().getUserProfile(sellerId),
             builder: (context, snapshot) {
               if (!snapshot.hasData) {
-                return const CircleAvatar(
-                  radius: 24,
-                  backgroundColor: AppColors.greyLight,
-                );
+                return const CircleAvatar(radius: 24, backgroundColor: AppColors.greyLight);
               }
 
               final userData = snapshot.data!.data() as Map<String, dynamic>?;
               final avatarUrl = userData?['avatarUrl'] as String?;
+              final displayName =
+                  userData?['fullName'] as String? ?? oldSellerName;
 
-              return CircleAvatar(
-                radius: 24,
-                backgroundColor: AppColors.greyLight,
-                backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
-                    ? NetworkImage(avatarUrl)
-                    : null,
-                child: (avatarUrl == null || avatarUrl.isEmpty)
-                    ? const Icon(Icons.person, color: Colors.white)
-                    : null,
+              return Row(
+                children: [
+                  CircleAvatar(
+                    radius: 24,
+                    backgroundColor: AppColors.greyLight,
+                    backgroundImage: (avatarUrl != null && avatarUrl.isNotEmpty)
+                        ? NetworkImage(avatarUrl)
+                        : null,
+                    child: (avatarUrl == null || avatarUrl.isEmpty)
+                        ? const Icon(Icons.person, color: Colors.white)
+                        : null,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    displayName,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
               );
             },
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(sellerName, style: const TextStyle(fontWeight: FontWeight.bold)),
-                const Text("Phản hồi: --", style: TextStyle(color: AppColors.greyDark, fontSize: 12)),
-              ],
-            ),
-          ),
+          const Spacer(),
           OutlinedButton(
             onPressed: () {
               Navigator.push(

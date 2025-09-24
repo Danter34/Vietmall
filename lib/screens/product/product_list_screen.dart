@@ -83,11 +83,32 @@ class _ProductListScreenState extends State<ProductListScreen> {
       body: StreamBuilder<QuerySnapshot>(
         stream: _productStream,
         builder: (context, snapshot) {
-          if (snapshot.hasError) return const Center(child: Text("Đã có lỗi xảy ra. Vui lòng tạo chỉ mục trên Firebase."));
+          if (snapshot.hasError) {
+            return const Center(
+              child: Text("Đã có lỗi xảy ra. Vui lòng tạo chỉ mục trên Firebase."),
+            );
+          }
           if (snapshot.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
           if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return const Center(child: Text("Không tìm thấy sản phẩm nào."));
+          }
+
+          // Lấy tất cả docs từ Firestore
+          var docs = snapshot.data!.docs;
+
+          // Lọc theo searchQuery ngay trên client
+          if (widget.searchQuery != null && widget.searchQuery!.isNotEmpty) {
+            final q = widget.searchQuery!.toLowerCase();
+            docs = docs.where((doc) {
+              final data = doc.data() as Map<String, dynamic>;
+              final title = (data['title'] ?? '').toString().toLowerCase();
+              return title.contains(q);
+            }).toList();
+          }
+
+          if (docs.isEmpty) {
             return const Center(child: Text("Không tìm thấy sản phẩm nào."));
           }
 
@@ -99,9 +120,9 @@ class _ProductListScreenState extends State<ProductListScreen> {
               mainAxisSpacing: 16,
               childAspectRatio: 0.7,
             ),
-            itemCount: snapshot.data!.docs.length,
+            itemCount: docs.length,
             itemBuilder: (context, index) {
-              var product = ProductModel.fromFirestore(snapshot.data!.docs[index]);
+              var product = ProductModel.fromFirestore(docs[index]);
               return ProductCard(product: product);
             },
           );

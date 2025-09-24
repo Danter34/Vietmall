@@ -29,7 +29,22 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
     'phone': '',
     'address': '',
   };
-  ShippingOption _selectedShipping = ShippingOption.fast; // Mặc định là Nhanh
+  ShippingOption _selectedShipping = ShippingOption.fast;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedAddress();
+  }
+
+  Future<void> _loadSavedAddress() async {
+    final savedAddress = await DatabaseService().getShippingAddress();
+    if (savedAddress != null && mounted) {
+      setState(() {
+        _shippingAddress = savedAddress;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -63,20 +78,34 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
 
   Widget _buildAddressSection() {
     return ListTile(
-      leading: const Icon(
-          Icons.location_on_outlined, color: AppColors.primaryRed),
+      leading: const Icon(Icons.location_on_outlined, color: AppColors.primaryRed),
       title: Text("${_shippingAddress['name']} | ${_shippingAddress['phone']}"),
-      subtitle: Text(_shippingAddress['address']!),
+      subtitle: Text(_shippingAddress['address'] ?? ''),
       trailing: const Icon(Icons.arrow_forward_ios, size: 16),
       onTap: () async {
         final result = await Navigator.push<Map<String, String>>(
           context,
           MaterialPageRoute(builder: (context) => const AddressScreen()),
         );
+
         if (result != null && mounted) {
+          // Validate số điện thoại
+          final phone = result['phone'] ?? '';
+          final isValidPhone = RegExp(r'^[0-9]{10}$').hasMatch(phone);
+
+          if (!isValidPhone) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('Số điện thoại không hợp lệ (phải đủ 10 số).')),
+            );
+            return;
+          }
+
           setState(() {
             _shippingAddress = result;
           });
+
+          // Lưu vào Firestore
+          await DatabaseService().saveShippingAddress(result);
         }
       },
     );
